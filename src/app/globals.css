@@ -1,26 +1,75 @@
 @import "tailwindcss";
 
+/* Quiet ink on paper: one ink, hairlines, blue only for links, red only for shortfalls. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #ffffff;
+  --fg: #1d1d1f;
+  --muted: #6b6b70;
+  --line: #e7e7e4;
+  --track: #efefec;
+  --subtle: #f1f1ef;
+  --accent: #2b4acb;
+  --bad: #c4321a;
+  --test-bg: #ece9ff;
+  --test-fg: #4636b8;
+  --urgent-bg: #fde6e1;
+  --urgent-fg: #9e2a12;
+  color-scheme: light;
 }
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg: #121214;
+    --fg: #ececee;
+    --muted: #9b9ba1;
+    --line: #2a2a2e;
+    --track: #26262a;
+    --subtle: #26262a;
+    --accent: #8ea2ff;
+    --bad: #ff7a63;
+    --test-bg: #2a2440;
+    --test-fg: #c9bfff;
+    --urgent-bg: #3a1f1a;
+    --urgent-fg: #ffb4a6;
+    color-scheme: dark;
   }
 }
 
+@theme inline {
+  --color-bg: var(--bg);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-track: var(--track);
+  --color-subtle: var(--subtle);
+  --color-accent: var(--accent);
+  --color-bad: var(--bad);
+  --color-test-bg: var(--test-bg);
+  --color-test-fg: var(--test-fg);
+  --color-urgent-bg: var(--urgent-bg);
+  --color-urgent-fg: var(--urgent-fg);
+  --font-sans: var(--font-ui);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+/* in base so an element's own outline-none utility can override it */
+@layer base {
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+}
+
+@layer components {
+  .course { @apply text-[13px] leading-snug font-semibold text-fg; }
+  .link { @apply text-accent hover:underline; }
+  .h2 { @apply text-[15px] font-semibold; }
+  .h3 { @apply text-[13px] font-semibold; }
+  .list { @apply border-t border-line; }
+  .list > * { @apply border-b border-line; }
+  .btn { @apply inline-flex h-9 items-center gap-1.5 rounded-lg border border-line px-3.5 text-[13px] font-medium hover:bg-subtle; }
+  .field { @apply flex h-10 items-center gap-2 rounded-lg border border-line px-3 text-sm text-muted focus-within:border-fg; }
+  .field input { @apply min-w-0 flex-1 bg-transparent text-fg outline-none placeholder:text-muted [&::-webkit-search-cancel-button]:hidden; }
+  .prose-moodle { @apply text-sm leading-relaxed break-words [&_a]:text-accent [&_a]:underline [&_img]:my-2 [&_img]:h-auto [&_img]:max-w-full [&_p]:my-1.5 [&_table]:block [&_table]:overflow-x-auto [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5; }
 }
