@@ -7,6 +7,7 @@ Built with Next.js 16 and TypeScript, on top of the official Moodle mobile web-s
 ## Features
 
 - **Today:** deadlines for the next 14 days grouped by day, overall attendance, upcoming calendar events and the latest announcements.
+- **Today's classes:** your timetable for today (or the next class day), with Now/Next. Tap a class to see what skipping it does to that course's attendance, and what skipping the whole day does overall.
 - **Attendance:** percentage per course from `mod_attendance`, with a 75% marker, the classes left before teaching ends, the best percentage you can still reach and what it takes ("Attend 4 of the 4 left").
 - **Leave record:** add leave days, then mark them accepted once the institute approves them. Accepted leave turns the LMS's absent marks on those days into presents in every number.
 - **Courses:** sections, notes, tasks and announcements in separate tabs, with search inside a course. PDFs open in the browser through a server-side proxy.

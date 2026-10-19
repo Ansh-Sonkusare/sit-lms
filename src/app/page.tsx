@@ -7,6 +7,7 @@ import { upcoming, when } from "@/lib/calendar.ts";
 import { LINKS } from "@/lib/links.ts";
 import { getDigest } from "@/lib/digest.ts";
 import AttendanceRows from "@/components/AttendanceRows.tsx";
+import TodayClasses from "@/components/TodayClasses.tsx";
 
 const TZ = "Asia/Kolkata";
 
@@ -75,7 +76,9 @@ export default async function Today() {
       </h1>
 
       <div className="mt-10 grid grid-cols-1 gap-14 md:mt-14 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] lg:gap-[72px]">
-        <section>
+        <div>
+          <TodayClasses today={today} attendance={attendance} />
+          <section>
           <h2 className="h2">Due</h2>
           {events.length === 0 && <p className="mt-4 text-sm text-muted">Nothing due in the next two weeks.</p>}
           {[...groups].map(([label, list]) => (
@@ -109,7 +112,8 @@ export default async function Today() {
               </div>
             </div>
           ))}
-        </section>
+          </section>
+        </div>
 
         <aside>
           <div className="flex items-baseline justify-between">

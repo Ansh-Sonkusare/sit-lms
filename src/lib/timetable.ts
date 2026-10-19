@@ -133,3 +133,8 @@ export function remainingByCourse(today: string): Map<number, number> {
 }
 
 export type Leave = { id: string; from: string; to: string; note: string; accepted: boolean };
+
+// The first day from `today` (inclusive) with classes, within two weeks; null once teaching is over.
+export function nextClassDay(today: string): string | null {
+  return daysBetween(today, TEACHING.end).slice(0, 14).find((d) => classesOn(d).length > 0) ?? null;
+}

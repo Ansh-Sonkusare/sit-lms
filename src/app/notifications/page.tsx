@@ -4,7 +4,7 @@ import { getAnnouncements, getCourses, getNotifications, type Announcement } fro
 import { getDigest, type DigestItem } from "@/lib/digest.ts";
 import { getDoneUpdates } from "@/lib/prefs.ts";
 import { EVENTS } from "@/lib/calendar.ts";
-import { ago, cleanCourse, cleanHtml, cleanTitle, countWord, stripHtml, todayIST, truncate } from "@/lib/format.ts";
+import { ago, cleanCourse, cleanHtml, cleanTitle, countWord, stripHtml, time12, todayIST, truncate } from "@/lib/format.ts";
 import { SITE } from "@/lib/moodle.ts";
 import { toggleUpdateDone } from "../actions.ts";
 
@@ -16,11 +16,6 @@ const addDays = (iso: string, n: number) => {
   return d.toISOString().slice(0, 10);
 };
 const daysUntil = (iso: string, today: string) => Math.round((Date.parse(iso) - Date.parse(today)) / 86_400_000);
-const time12 = (t: string) => {
-  const [h, m] = t.split(":").map(Number);
-  return `${h % 12 || 12}${m ? `:${String(m).padStart(2, "0")}` : ""} ${h < 12 ? "am" : "pm"}`;
-};
-
 type Row = { a: Announcement; d?: DigestItem; course: string };
 type Dated = { label: string; date: string; time: string | null; kind: string; row: Row };
 

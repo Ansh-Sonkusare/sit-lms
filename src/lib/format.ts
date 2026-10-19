@@ -138,3 +138,18 @@ export const truncate = (s: string, n: number) => {
   const cut = chars.slice(0, n).join("");
   return `${cut.slice(0, cut.lastIndexOf(" ") > n * 0.6 ? cut.lastIndexOf(" ") : cut.length).trimEnd()}…`;
 };
+
+// "13:05" → "1:05 pm"
+export const time12 = (t: string) => {
+  const [h, m] = t.split(":").map(Number);
+  return `${h % 12 || 12}${m ? `:${String(m).padStart(2, "0")}` : ""} ${h < 12 ? "am" : "pm"}`;
+};
+
+export const nowIST = () => new Date().toLocaleTimeString("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false });
+
+// What missing `n` more classes does to a course: the new percentage and what it then takes.
+export function skipText(attended: number, marked: number, left?: number, n = 1) {
+  const after = (attended / (marked + n)) * 100;
+  const safe = after >= TARGET && budget(attended, marked + n) >= 0;
+  return { after, safe, then: budgetText(attended, marked + n, left) };
+}
