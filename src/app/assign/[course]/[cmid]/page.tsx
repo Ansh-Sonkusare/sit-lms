@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/session.ts";
 import { getAssignment, getCourses } from "@/lib/data.ts";
 import { SITE } from "@/lib/moodle.ts";
-import { cleanCourse, fmtTime, relDay } from "@/lib/format.ts";
+import { cleanCourse, fileExt, fileSize, fmtTime, relDay } from "@/lib/format.ts";
 
 const LABEL: Record<string, string> = { new: "Not submitted", submitted: "Submitted", draft: "Draft" };
 
@@ -43,6 +43,19 @@ export default async function Assignment({ params }: PageProps<"/assign/[course]
         </div>
       </dl>
       {a.intro && <div className="prose-moodle mt-8 max-w-[720px] border-t border-line pt-6" dangerouslySetInnerHTML={{ __html: a.intro }} />}
+      {!!a.introattachments?.length && (
+        <section className="mt-8 max-w-[720px]">
+          <h2 className="h2">Files</h2>
+          <div className="list mt-3">
+            {a.introattachments.map((f) => (
+              <a key={f.fileurl} href={`/api/file?url=${encodeURIComponent(f.fileurl)}`} target="_blank" className="flex items-baseline justify-between gap-4 py-3 text-[15px]">
+                <span className="min-w-0 break-words">{f.filename}</span>
+                <span className="shrink-0 text-[13px] text-muted uppercase">{[fileExt(f.filename), fileSize(f.filesize)].filter(Boolean).join(" · ")}</span>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
       <div className="mt-8 flex flex-wrap gap-2">
         <a href={`${SITE}/mod/assign/view.php?id=${cmid}&action=editsubmission`} target="_blank" className="inline-flex h-10 items-center rounded-lg bg-fg px-4 text-sm font-medium text-bg">Submit on the LMS</a>
         <a href={`${SITE}/mod/assign/view.php?id=${cmid}`} target="_blank" className="btn h-10">Open on the LMS</a>

@@ -153,6 +153,7 @@ const Assignment = z.object({
   intro: z.string().nullish(),
   duedate: z.number(),
   cutoffdate: z.number().nullish(),
+  introattachments: z.array(z.object({ filename: z.string(), fileurl: z.string(), filesize: z.number().nullish() })).nullish(),
 });
 export const getAssignments = (u: User, courseid: number) =>
   api(
