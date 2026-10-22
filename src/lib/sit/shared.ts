@@ -23,12 +23,14 @@ export function parseShared(college: string, stored: unknown): CollegeTimetables
   return list.length ? { defaultId: list.some((t) => t.id === doc.data.defaultId) ? doc.data.defaultId : list[0].id, list } : null;
 }
 
-// Applies one admin change to a fresh read of the college's document. null: the college has no timetables.
-export const updateShared = <R>(store: DocStore, college: string, apply: (doc: CollegeTimetables) => Change<R>): Promise<Updated<R | null>> =>
-  update(store, sharedPath(college), (cur): Change<R | null> => {
+// Applies one admin change to a fresh read of the college's document; `none` is the result when it has no timetables.
+export const updateShared = <R>(store: DocStore, college: string, none: R, apply: (doc: CollegeTimetables) => Change<R>): Promise<Updated<R>> =>
+  update(store, sharedPath(college), (cur): Change<R> => {
     const doc = parseShared(college, cur ? cur.value : undefined);
-    return doc ? apply(doc) : { result: null };
+    return doc ? apply(doc) : { result: none };
   });
+
+export const NO_TIMETABLES = "This college has no timetables.";
 
 export const savedAt = (iso: string) => new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 

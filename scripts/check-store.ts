@@ -125,7 +125,7 @@ const faulty = (inner: DocStore, faults: { read?: number; conflicts?: number; on
 
 // Admin changes to a college's timetables, through the same update() the app uses.
 const path = sharedPath(SEED.college);
-const shared = <R>(s: DocStore, apply: (doc: CollegeTimetables) => Change<R>) => updateShared(s, SEED.college, apply);
+const shared = <R>(s: DocStore, apply: (doc: CollegeTimetables) => Change<R>) => updateShared<R | null>(s, SEED.college, null, apply);
 const stored = async (s: DocStore) => parseShared(SEED.college, (await s.read(path))!.value)!;
 const by = (name: string) => ({ college: SEED.college, name, now: new Date().toISOString() });
 const create = (name: string) => (doc: CollegeTimetables) => applySave(doc, { ...SEED, id: "new", name, updatedAt: "" }, by(name));
@@ -187,6 +187,12 @@ const create = (name: string) => (doc: CollegeTimetables) => applySave(doc, { ..
   await s.write(path, { not: "timetables" }, null);
   assert.deepEqual(await shared(s, create("X")), { ok: false, reason: "unavailable" }, "an unreadable document is never replaced");
   assert.deepEqual((await s.read(path))!.value, { not: "timetables" });
+}
+
+{
+  const s = memoryStore();
+  assert.deepEqual(await updateShared<unknown>(s, "other-college", "none", create("X")), { ok: true, result: "none" }, "only the seed's college is seeded");
+  assert.equal(await s.read(sharedPath("other-college")), null);
 }
 
 console.log("store ok");

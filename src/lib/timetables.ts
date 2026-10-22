@@ -7,7 +7,7 @@ import { update, type Change, type Doc, type Updated } from "./doc.ts";
 import { getTimetableChoice, setTimetableChoice } from "./prefs.ts";
 import { getCourses, getSessions } from "./data.ts";
 import { coursesOf, fieldErrors, TimetableSchema, type Schedule, type Timetable } from "./sit/timetable.ts";
-import { applyDefault, applyDelete, applySave, fail, parseShared, savedAt, sharedPath, updateShared, type CollegeTimetables, type SaveResult } from "./sit/shared.ts";
+import { applyDefault, applyDelete, applySave, fail, NO_TIMETABLES, parseShared, savedAt, sharedPath, updateShared, type CollegeTimetables, type SaveResult } from "./sit/shared.ts";
 import { rankSchedules, suggestion } from "./sit/suggest.ts";
 import { todayIST } from "./format.ts";
 import type { User } from "./session.ts";
@@ -31,8 +31,8 @@ const readForPage = (path: string) => store.read(path).catch(() => store.read(pa
 export const loadShared = (college: string) =>
   cached(memoKey(sharedPath(college)), TTL, async () => parseShared(college, await readForPage(sharedPath(college)).then((d) => (d ? d.value : undefined))));
 
-async function changeShared<R>(college: string, apply: (doc: CollegeTimetables) => Change<R>) {
-  const r = await updateShared(store, college, apply);
+async function changeShared<R>(college: string, none: R, apply: (doc: CollegeTimetables) => Change<R>) {
+  const r = await updateShared(store, college, none, apply);
   clearCache(memoKey(sharedPath(college)));
   return r;
 }
@@ -101,19 +101,18 @@ const failure = (r: { reason: "conflict" | "unavailable" }) => (r.reason === "co
 
 export async function saveShared(u: User, raw: unknown): Promise<SaveResult> {
   const by = { college: u.college.id, name: u.fullname || undefined, now: new Date().toISOString() };
-  const r = await changeShared(u.college.id, (doc) => applySave(doc, raw, by));
-  if (!r.ok) return fail(failure(r));
-  return r.result ?? fail("This college has no timetables.");
+  const r = await changeShared(u.college.id, fail(NO_TIMETABLES), (doc) => applySave(doc, raw, by));
+  return r.ok ? r.result : fail(failure(r));
 }
 
 // null when done, else a message for the admin.
 export async function deleteShared(u: User, id: string): Promise<string | null> {
-  const r = await changeShared(u.college.id, (doc) => applyDelete(doc, id));
+  const r = await changeShared<string | null>(u.college.id, NO_TIMETABLES, (doc) => applyDelete(doc, id));
   return r.ok ? r.result : failure(r);
 }
 
 export async function setDefault(u: User, id: string): Promise<string | null> {
-  const r = await changeShared(u.college.id, (doc) => applyDefault(doc, id));
+  const r = await changeShared<string | null>(u.college.id, NO_TIMETABLES, (doc) => applyDefault(doc, id));
   return r.ok ? r.result : failure(r);
 }
 
