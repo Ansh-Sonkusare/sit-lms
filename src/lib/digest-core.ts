@@ -189,7 +189,7 @@ let instances = 0;
 // `userKey` names a user's digest document. `now` is injectable so tests can move time.
 export function createDigest({ store, now, userKey }: { store: DocStore; now: () => number; userKey: (u: User) => string }) {
   const cacheId = `digest-gate:${++instances}`;
-  const pathOf = (u: User) => `digest/${encodeURIComponent(userKey(u))}.json`;
+  const pathOf = (u: User) => `digest/${userKey(u)}.json`;
   const running = new Map<string, Promise<void>>();
   const calls: number[] = [];
   let overBudgetLoggedAt = 0;

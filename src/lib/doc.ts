@@ -10,6 +10,12 @@ export interface DocStore {
 
 export class StoreError extends Error {}
 
+// Vercel Blob stores a name like "a%3Ab" as given, but get() on it finds nothing, so such a document could be written and never read back.
+export function safePath(path: string) {
+  if (!/^[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/.test(path)) throw new Error(`unsafe document path: ${path}`);
+  return path;
+}
+
 export const parseDoc = (path: string, text: string, etag: string): Doc => {
   try {
     return { value: JSON.parse(text), etag };
@@ -25,11 +31,11 @@ export function memoryStore(): DocStore & { raw: Map<string, { text: string; eta
   return {
     raw,
     async read(path) {
-      const hit = raw.get(path);
+      const hit = raw.get(safePath(path));
       return hit ? parseDoc(path, hit.text, hit.etag) : null;
     },
     async write(path, value, expect) {
-      const hit = raw.get(path);
+      const hit = raw.get(safePath(path));
       if (expect === null ? hit : hit?.etag !== expect) return "conflict";
       raw.set(path, { text: JSON.stringify(value), etag: `"m${++n}"` });
       return "ok";

@@ -2,14 +2,14 @@ import "server-only";
 import { after } from "next/server";
 import { store } from "./store.ts";
 import { createDigest, type Cached, type Digest } from "./digest-core.ts";
-import { cacheKey, type Announcement, type Course } from "./data.ts";
+import { type Announcement, type Course } from "./data.ts";
 import type { User } from "./session.ts";
 import { getSchedule } from "./timetables.ts";
 import { scheduleLabel } from "./sit/timetable.ts";
 
 export type { Digest, DigestItem } from "./digest-core.ts";
 
-const digest = createDigest({ store, now: Date.now, userKey: cacheKey });
+const digest = createDigest({ store, now: Date.now, userKey: (u) => `${u.college.id}-${u.userid}` });
 
 // Pages call this: cached digest now, and a background refresh after the response if anything is missing.
 export async function getDigest(u: User, news: Announcement[], courses: Course[]): Promise<Digest> {

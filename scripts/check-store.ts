@@ -188,4 +188,9 @@ const create = (name: string) => (doc: CollegeTimetables) => applySave(doc, { ..
   assert.equal(await s.read(sharedPath("other-college")), null);
 }
 
+// A name Blob stores but can't read back (the digest path once held an escaped site URL) is refused up front.
+await assert.rejects(memoryStore().write("digest/https%3A%2F%2Fx%7C1.json", {}, null), /unsafe document path/);
+await assert.rejects(memoryStore().read("digest/a b.json"), /unsafe document path/);
+assert.equal(await memoryStore().write("digest/sit-nagpur-1809.json", {}, null), "ok");
+
 console.log("store ok");
