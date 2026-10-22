@@ -46,9 +46,9 @@ export default function TodayClasses({
   const rowOf = (id: number | null) =>
     attendance?.rows.find((r) => r.courseid === id);
   const current = isToday ? classes.findIndex((c) => c.end > now) : -1;
-  const counted = classes.filter(
-    (c, i) => i >= current && rowOf(c.courseid),
-  ).length;
+  const counted = classes
+    .filter((c, i) => i >= current && rowOf(c.courseid))
+    .reduce((n, c) => n + c.slots, 0);
   const holiday = holidayOn(today);
   const heading = isToday
     ? "Today's classes"
@@ -123,6 +123,7 @@ export default function TodayClasses({
             TIMETABLED.has(r.courseid)
               ? (left.get(r.courseid) ?? 0)
               : undefined,
+            c.slots,
           );
           return (
             <details key={i} className="group">
