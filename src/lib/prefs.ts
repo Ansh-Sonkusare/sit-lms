@@ -4,7 +4,9 @@ import { cookies } from "next/headers";
 import type { Leave } from "./sit/timetable.ts";
 export type { Leave };
 
-type Prefs = { leaves?: Leave[]; extraCourses?: number[]; doneUpdates?: number[] };
+// timetable: the one you picked; id "personal" is your own copy. Absent: the college default.
+export type TimetableChoice = { id: string; batch: string | null };
+type Prefs = { leaves?: Leave[]; extraCourses?: number[]; doneUpdates?: number[]; timetable?: TimetableChoice };
 
 // Its own long-lived cookie (name kept from when it only held leaves), so signing out doesn't wipe it.
 // ponytail: cookie-sized (~40 leaves); move to a server store if it outgrows that.
@@ -52,5 +54,16 @@ export async function setUpdateDone(id: number, done: boolean) {
   if (done) set.add(id);
   else set.delete(id);
   s.doneUpdates = [...set].slice(-150);
+  await s.save();
+}
+
+export async function getTimetableChoice(): Promise<TimetableChoice | null> {
+  return (await store()).timetable ?? null;
+}
+
+export async function setTimetableChoice(choice: TimetableChoice | null) {
+  const s = await store();
+  if (choice) s.timetable = choice;
+  else delete s.timetable;
   await s.save();
 }

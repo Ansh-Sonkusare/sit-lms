@@ -8,12 +8,14 @@ import { coursesOf, remainingByCourse, scheduleLabel } from "@/lib/sit/timetable
 import { getSchedule } from "@/lib/timetables.ts";
 import { TEACHING } from "@/lib/sit/calendar.ts";
 import { Bar, sortRows } from "@/components/AttendanceRows.tsx";
+import ScheduleBanner from "@/components/ScheduleBanner.tsx";
 import { refresh } from "../actions.ts";
 
 export default async function AttendancePage() {
   const u = await requireUser();
-  const schedule = (await getSchedule(u))?.schedule;
-  if (!schedule) notFound();
+  const info = await getSchedule(u);
+  if (!info) notFound();
+  const { schedule } = info;
   const data = await getAttendance(u).catch(() => null);
   const rows = data ? sortRows(data.rows) : [];
   const { marked = 0, attended = 0, overall = 0 } = data ?? {};
@@ -54,6 +56,8 @@ export default async function AttendancePage() {
           <a className="btn" href={ATTENDANCE_URL} target="_blank">Open on the LMS</a>
         </div>
       </div>
+
+      <ScheduleBanner info={info} className="mt-6 max-w-[640px]" />
 
       {!data && <p className="mt-6 text-sm text-bad">Attendance couldn&apos;t be loaded from the LMS. Refresh, or open the report on the LMS.</p>}
 

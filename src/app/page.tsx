@@ -9,6 +9,7 @@ import { LINKS } from "@/lib/sit/links.ts";
 import { getDigest } from "@/lib/digest.ts";
 import AttendanceRows from "@/components/AttendanceRows.tsx";
 import TodayClasses from "@/components/TodayClasses.tsx";
+import ScheduleBanner from "@/components/ScheduleBanner.tsx";
 
 const TZ = "Asia/Kolkata";
 
@@ -26,7 +27,8 @@ function dayLabel(e: Deadline) {
 
 export default async function Today() {
   const u = await requireUser();
-  const schedule = (await getSchedule(u))?.schedule ?? null;
+  const info = await getSchedule(u);
+  const schedule = info?.schedule ?? null;
   const [lmsEvents, att, marks, courses, news] = await Promise.all([
     getDeadlines(u),
     u.college.sit ? getAttendance(u).catch((e: Error) => e) : null,
@@ -81,6 +83,7 @@ export default async function Today() {
 
       <div className={`mt-10 grid grid-cols-1 gap-14 md:mt-14 lg:gap-[72px] ${sit ? "lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]" : ""}`}>
         <div>
+          <ScheduleBanner info={info} className="mb-6" />
           {schedule && <TodayClasses schedule={schedule} today={today} attendance={attendance} marks={marks} />}
           <section>
           <h2 className="h2">Due</h2>

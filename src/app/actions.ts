@@ -6,7 +6,8 @@ import { call, clearCache, login as moodleLogin, MoodleError } from "@/lib/moodl
 import { getSession, requireUser } from "@/lib/session.ts";
 import { findCollege } from "@/lib/colleges.ts";
 import { cacheKey } from "@/lib/data.ts";
-import { getLeaves, saveLeaves, setExtraCourse, setUpdateDone } from "@/lib/prefs.ts";
+import { getLeaves, saveLeaves, setExtraCourse, setTimetableChoice, setUpdateDone } from "@/lib/prefs.ts";
+import { loadShared, optionsOf } from "@/lib/timetables.ts";
 
 export async function login(_: string | null, form: FormData) {
   const username = String(form.get("username") ?? "").trim();
@@ -71,5 +72,16 @@ export async function toggleCourse(id: number, on: boolean) {
 export async function toggleUpdateDone(id: number, done: boolean) {
   await requireUser();
   await setUpdateDone(id, done);
+  refreshRoute();
+}
+
+// form "choice": "<timetable id>|<batch>", the batch empty for a timetable without batches.
+export async function chooseTimetable(form: FormData) {
+  const u = await requireUser();
+  const [id, batch = ""] = String(form.get("choice") ?? "").split("|");
+  const doc = u.college.sit ? await loadShared(u.college.id) : null;
+  const option = optionsOf(doc?.list ?? []).find((o) => o.timetable.id === id && (o.batch ?? "") === batch);
+  if (!option) return;
+  await setTimetableChoice({ id, batch: option.batch });
   refreshRoute();
 }
