@@ -92,7 +92,7 @@ export default async function Updates({ searchParams }: PageProps<"/notification
         <div>
           <p className="text-sm text-muted">
             {digest.updatedAt ? `AI digest of your latest announcements, updated ${ago(digest.updatedAt / 1000)}` : "Announcements from your courses"}
-            {digest.pending > 0 && `. Summarizing ${digest.pending} more, refresh in a minute`}
+            {digest.pending > 0 && (digest.paused ? ". AI summaries are paused" : `. Summarizing ${digest.pending} more, refresh in a minute`)}
           </p>
           <h1 className="mt-2.5 text-[26px] leading-[1.2] font-medium tracking-[-0.02em] md:text-[40px] md:leading-[1.15] md:tracking-[-0.025em]">{headline}</h1>
         </div>
@@ -160,7 +160,7 @@ export default async function Updates({ searchParams }: PageProps<"/notification
               {f !== "tests" && <span className="text-[13px] text-muted">Tick when done</span>}
             </div>
             {!digest.items.size ? (
-              <p className="mt-3 text-sm text-muted">{digest.pending ? "Summarizing your announcements. This page fills in within a minute or two." : "Add an AI key to get a to-do list from your announcements."}</p>
+              <p className="mt-3 text-sm text-muted">{digest.paused ? "AI summaries are paused for now." : digest.pending ? "Summarizing your announcements. This page fills in within a minute or two." : "Add an AI key to get a to-do list from your announcements."}</p>
             ) : (
               <div className="list mt-3">
                 {(f === "tests" ? open.filter((r) => r.d!.kind === "exam" || r.d!.dates.some(isTest)) : open).map((r) => (
