@@ -108,18 +108,21 @@ export async function saveSharedTimetable(_: FieldError[] | null, form: FormData
   redirect("/admin/timetables");
 }
 
-export async function deleteTimetable(id: string) {
+// Bound to a timetable id for useActionState; the result is a message for the admin, or null when done.
+export async function deleteTimetable(id: string): Promise<string | null> {
   const u = await requireAdmin();
-  if (!u) return;
-  await deleteShared(u, id);
-  refreshRoute();
+  if (!u) return "Only admins can change shared timetables.";
+  const error = await deleteShared(u, id);
+  if (!error) refreshRoute();
+  return error;
 }
 
-export async function makeDefaultTimetable(id: string) {
+export async function makeDefaultTimetable(id: string): Promise<string | null> {
   const u = await requireAdmin();
-  if (!u) return;
-  await setDefault(u, id);
-  refreshRoute();
+  if (!u) return "Only admins can change shared timetables.";
+  const error = await setDefault(u, id);
+  if (!error) refreshRoute();
+  return error;
 }
 
 export async function makeMyTimetableCopy() {

@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/session.ts";
 import { isAdmin, loadShared } from "@/lib/timetables.ts";
 import { dayLabel } from "@/lib/sit/marks.ts";
 import { deleteTimetable, makeDefaultTimetable } from "../../actions.ts";
+import ActionForm from "@/components/ActionForm.tsx";
 
 const updated = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric" });
 
@@ -40,17 +41,17 @@ export default async function AdminTimetables() {
               <span className="flex flex-wrap gap-2">
                 <Link href={`/admin/timetables/${t.id}`} className="btn">Edit</Link>
                 {!isDefault && (
-                  <form action={makeDefaultTimetable.bind(null, t.id)}>
+                  <ActionForm action={makeDefaultTimetable.bind(null, t.id)}>
                     <button className="btn">Make default</button>
-                  </form>
+                  </ActionForm>
                 )}
                 {!isDefault && (
                   <details className="relative">
                     <summary className="btn cursor-pointer list-none text-muted [&::-webkit-details-marker]:hidden">Delete</summary>
-                    <form action={deleteTimetable.bind(null, t.id)} className="absolute right-0 z-10 mt-1 w-64 rounded-lg border border-line bg-bg p-3 text-[13px]">
+                    <ActionForm action={deleteTimetable.bind(null, t.id)} className="absolute right-0 z-10 mt-1 w-64 rounded-lg border border-line bg-bg p-3 text-[13px]">
                       <p className="text-muted">Students using it go back to the default. Their own copies stay.</p>
                       <button className="btn mt-3 text-bad">Delete {t.name}</button>
-                    </form>
+                    </ActionForm>
                   </details>
                 )}
               </span>
