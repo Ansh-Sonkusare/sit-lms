@@ -25,5 +25,12 @@ for _ in $(seq 1 120); do
   sleep 0.5
 done
 grep -q "Ready in" "$LOG" || { echo "no 'Ready in' within 60s; see $LOG" >&2; exit 1; }
+sleep 1
+if grep -q "Another next dev server is already running" "$LOG"; then
+  echo "this checkout already has a next dev server (Next allows one per directory):" >&2
+  grep -A3 "Another next dev server" "$LOG" >&2
+  echo "stop it with stop.sh <its port>, or reuse it" >&2
+  exit 1
+fi
 curl -fsS -o /dev/null --max-time 120 "http://localhost:$PORT/login" || { echo "/login did not answer; see $LOG" >&2; exit 1; }
 echo "ready: http://localhost:$PORT  pid=$(cat "$PIDFILE")  log=$LOG"
