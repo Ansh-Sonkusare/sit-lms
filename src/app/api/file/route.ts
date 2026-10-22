@@ -1,9 +1,8 @@
-import { SITE } from "@/lib/moodle.ts";
-import { getSession } from "@/lib/session.ts";
+import { currentUser } from "@/lib/session.ts";
 
 export async function GET(req: Request) {
-  const s = await getSession();
-  if (!s.token) return new Response("Unauthorized", { status: 401 });
+  const s = await currentUser();
+  if (!s) return new Response("Unauthorized", { status: 401 });
 
   let u: URL;
   try {
@@ -12,7 +11,7 @@ export async function GET(req: Request) {
     return new Response("Bad url", { status: 400 });
   }
   // URL parsing normalises "..", so checking the parsed pathname is safe
-  const site = new URL(SITE);
+  const site = new URL(s.site);
   const p = u.pathname.replace(/^\/pluginfile\.php\//, "/webservice/pluginfile.php/");
   if (u.origin !== site.origin || !p.startsWith("/webservice/pluginfile.php/"))
     return new Response("Bad url", { status: 400 });

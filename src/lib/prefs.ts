@@ -1,7 +1,7 @@
 import { getIronSession } from "iron-session";
 import { cookies } from "next/headers";
 
-import type { Leave } from "./timetable.ts";
+import type { Leave } from "./sit/timetable.ts";
 export type { Leave };
 
 type Prefs = { leaves?: Leave[]; extraCourses?: number[]; doneUpdates?: number[] };

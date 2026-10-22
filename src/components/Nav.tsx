@@ -9,16 +9,16 @@ const ITEMS = [
   { href: "/notifications", label: "Updates", icon: "M6 16v-5a6 6 0 1 1 12 0v5l2 2H4zM10 21h4" },
 ];
 
-export default function Nav({ unread }: { unread: number }) {
+export default function Nav({ unread, attendance }: { unread: number; attendance: boolean }) {
   const path = usePathname();
   const active = (href: string) =>
     href === "/" ? path === "/" : path.startsWith(href) || (href === "/courses" && path.startsWith("/assign"));
   return (
     <nav
       aria-label="Main"
-      className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-4 border-t border-line bg-bg pb-[env(safe-area-inset-bottom)] md:static md:flex md:gap-6 md:self-stretch md:border-0 md:pb-0"
+      className={`fixed inset-x-0 bottom-0 z-20 grid ${attendance ? "grid-cols-4" : "grid-cols-3"} border-t border-line bg-bg pb-[env(safe-area-inset-bottom)] md:static md:flex md:gap-6 md:self-stretch md:border-0 md:pb-0`}
     >
-      {ITEMS.map((i) => (
+      {ITEMS.filter((i) => attendance || i.href !== "/attendance").map((i) => (
         <Link
           key={i.href}
           href={i.href}

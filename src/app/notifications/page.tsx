@@ -3,9 +3,8 @@ import { requireUser } from "@/lib/session.ts";
 import { getAnnouncements, getCourses, getNotifications, type Announcement } from "@/lib/data.ts";
 import { getDigest, type DigestItem } from "@/lib/digest.ts";
 import { getDoneUpdates } from "@/lib/prefs.ts";
-import { EVENTS } from "@/lib/calendar.ts";
+import { EVENTS } from "@/lib/sit/calendar.ts";
 import { ago, cleanCourse, cleanHtml, cleanTitle, countWord, stripHtml, time12, todayIST, truncate } from "@/lib/format.ts";
-import { SITE } from "@/lib/moodle.ts";
 import { toggleUpdateDone } from "../actions.ts";
 
 const TZ = "Asia/Kolkata";
@@ -20,11 +19,11 @@ type Row = { a: Announcement; d?: DigestItem; course: string };
 type Dated = { label: string; date: string; time: string | null; kind: string; row: Row };
 
 // Links teachers shared, named by where they go.
-function linksIn(html: string) {
+function linksIn(html: string, site: string) {
   const urls = [...new Set([...html.matchAll(/https?:\/\/[^\s"'<>)]+/g)].map((m) => m[0].replace(/[.,;]+$/, "")))];
   return urls.map((url) => {
     const host = new URL(url).hostname;
-    const label = host.includes("notebook.google") ? "NotebookLM" : host.includes("forms.gle") || host.includes("docs.google.com/forms") ? "Form" : host.includes("lms.sitnagpur") ? "File" : host.replace(/^www\./, "");
+    const label = host.includes("notebook.google") ? "NotebookLM" : host.includes("forms.gle") || host.includes("docs.google.com/forms") ? "Form" : host === new URL(site).hostname ? "File" : host.replace(/^www\./, "");
     return { url, label };
   });
 }
@@ -46,7 +45,7 @@ export default async function Updates({ searchParams }: PageProps<"/notification
     getNotifications(u).catch(() => ({ notifications: [], unreadcount: 0 })),
     getDoneUpdates(),
   ]);
-  const digest = await getDigest(u.userid, news, courses);
+  const digest = await getDigest(u, news, courses);
   const today = todayIST();
   const doneSet = new Set(done);
   const nameOf = new Map(courses.map((c) => [c.id, cleanCourse(c.fullname)]));
@@ -70,7 +69,7 @@ export default async function Updates({ searchParams }: PageProps<"/notification
   const results = mine.filter((r) => r.d?.kind === "result" && recent(r));
   const links = mine
     .filter((r) => r.d?.kind === "resource")
-    .flatMap((r) => linksIn(r.a.message).map((l) => ({ ...l, course: r.course, title: r.d!.title })));
+    .flatMap((r) => linksIn(r.a.message, u.site).map((l) => ({ ...l, course: r.course, title: r.d!.title })));
   const linkGroups = Map.groupBy(links, (l) => l.course);
   const shown = new Set([...todo, ...results].map((r) => r.a.id).concat(mine.filter((r) => r.d?.kind === "resource").map((r) => r.a.id)));
   const rest = mine.filter((r) => !shown.has(r.a.id) && recent(r));
@@ -117,7 +116,7 @@ export default async function Updates({ searchParams }: PageProps<"/notification
           <div className="grid auto-cols-[minmax(124px,1fr)] grid-flow-col overflow-x-auto rounded-xl border border-line [scrollbar-width:none]">
             {week.map((day, i) => {
               const items = dated.filter((x) => x.date === day);
-              const cal = EVENTS.filter((e) => (e.kind === "Holiday" ? e.start <= day && day <= e.end : e.start === day));
+              const cal = !u.college.sit ? [] : EVENTS.filter((e) => (e.kind === "Holiday" ? e.start <= day && day <= e.end : e.start === day));
               const sunday = new Date(`${day}T00:00:00Z`).getUTCDay() === 0;
               return (
                 <div key={day} className={`min-h-[150px] p-3 ${i < 6 ? "border-r border-line" : ""} ${i === 0 ? "bg-subtle/50" : ""}`}>
@@ -165,9 +164,9 @@ export default async function Updates({ searchParams }: PageProps<"/notification
             ) : (
               <div className="list mt-3">
                 {(f === "tests" ? open.filter((r) => r.d!.kind === "exam" || r.d!.dates.some(isTest)) : open).map((r) => (
-                  <TodoRow key={r.a.id} r={r} done={false} today={today} />
+                  <TodoRow key={r.a.id} site={u.site} r={r} done={false} today={today} />
                 ))}
-                {f !== "tests" && closed.map((r) => <TodoRow key={r.a.id} r={r} done today={today} />)}
+                {f !== "tests" && closed.map((r) => <TodoRow key={r.a.id} site={u.site} r={r} done today={today} />)}
                 {open.length === 0 && f !== "tests" && closed.length === 0 && <p className="py-4 text-sm text-muted">Nothing to do right now.</p>}
               </div>
             )}
@@ -200,7 +199,7 @@ export default async function Updates({ searchParams }: PageProps<"/notification
                 <h2 className="h2">Results</h2>
                 <div className="list mt-3 text-sm">
                   {results.map((r) => (
-                    <a key={r.a.id} href={`${SITE}/mod/forum/discuss.php?d=${r.a.discussion}`} target="_blank" className="flex items-baseline justify-between gap-3 py-3">
+                    <a key={r.a.id} href={`${u.site}/mod/forum/discuss.php?d=${r.a.discussion}`} target="_blank" className="flex items-baseline justify-between gap-3 py-3">
                       <span className="min-w-0"><span className="course block">{r.course}</span>{r.d!.title}</span>
                       <span className="shrink-0 text-[13px] text-muted">{ago(r.a.timemodified)}</span>
                     </a>
@@ -227,7 +226,7 @@ export default async function Updates({ searchParams }: PageProps<"/notification
                 <summary className="cursor-pointer text-sm text-muted">Not for your section, {notMine.length} hidden</summary>
                 <div className="list mt-3 text-sm text-muted">
                   {notMine.map((r) => (
-                    <a key={r.a.id} href={`${SITE}/mod/forum/discuss.php?d=${r.a.discussion}`} target="_blank" className="block py-2.5">
+                    <a key={r.a.id} href={`${u.site}/mod/forum/discuss.php?d=${r.a.discussion}`} target="_blank" className="block py-2.5">
                       {r.d!.title}
                       <span className="block text-xs">{r.course}</span>
                     </a>
@@ -253,7 +252,7 @@ export default async function Updates({ searchParams }: PageProps<"/notification
                   </span>
                   <span className="order-3 text-right text-[13px] text-muted">{ago(r.a.timemodified)}</span>
                 </summary>
-                <Original a={r.a} />
+                <Original site={u.site} a={r.a} />
               </details>
             ))}
           </div>
@@ -263,7 +262,7 @@ export default async function Updates({ searchParams }: PageProps<"/notification
   );
 }
 
-function TodoRow({ r, done, today }: { r: Row; done: boolean; today: string }) {
+function TodoRow({ site, r, done, today }: { site: string; r: Row; done: boolean; today: string }) {
   const d = r.d!;
   const next = d.dates.filter((x) => x.date >= today).sort((x, y) => x.date.localeCompare(y.date))[0];
   const n = next ? daysUntil(next.date, today) : null;
@@ -294,7 +293,7 @@ function TodoRow({ r, done, today }: { r: Row; done: boolean; today: string }) {
         {!done && (
           <details className="mt-2">
             <summary className="w-fit cursor-pointer text-[13px] text-accent">Show original</summary>
-            <Original a={r.a} />
+            <Original site={site} a={r.a} />
           </details>
         )}
       </div>
@@ -315,11 +314,11 @@ function TodoRow({ r, done, today }: { r: Row; done: boolean; today: string }) {
   );
 }
 
-function Original({ a }: { a: Announcement }) {
+function Original({ site, a }: { site: string; a: Announcement }) {
   return (
     <div className="mt-2">
       <div className="prose-moodle max-w-[680px] border-l-2 border-line pl-4 text-muted" dangerouslySetInnerHTML={{ __html: cleanHtml(a.message) }} />
-      <a href={`${SITE}/mod/forum/discuss.php?d=${a.discussion}`} target="_blank" className="link mt-2 inline-block text-[13px]">Open on the LMS</a>
+      <a href={`${site}/mod/forum/discuss.php?d=${a.discussion}`} target="_blank" className="link mt-2 inline-block text-[13px]">Open on the LMS</a>
     </div>
   );
 }

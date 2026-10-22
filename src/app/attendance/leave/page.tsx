@@ -1,15 +1,17 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/session.ts";
 import { getAttendance, sessionsOnLeave } from "@/lib/data.ts";
 import { getLeaves } from "@/lib/prefs.ts";
-import { classesOn, daysBetween } from "@/lib/timetable.ts";
-import { holidayOn, TEACHING, when } from "@/lib/calendar.ts";
-import { cleanCourse, todayIST, TARGET } from "@/lib/format.ts";
+import { classesOn, daysBetween } from "@/lib/sit/timetable.ts";
+import { holidayOn, TEACHING } from "@/lib/sit/calendar.ts";
+import { cleanCourse, todayIST, TARGET, when } from "@/lib/format.ts";
 import { removeLeave, setLeaveAccepted } from "../../actions.ts";
 import AddLeaveForm from "@/components/AddLeaveForm.tsx";
 
 export default async function LeavePage() {
   const u = await requireUser();
+  if (!u.college.sit) notFound();
   const today = todayIST();
   const leaves = await getLeaves();
   const [lms, now, all, sessions] = await Promise.all([

@@ -7,12 +7,13 @@ import { toggleCourse } from "../actions.ts";
 const byName = (cs: Course[]) => cs.map((c) => ({ ...c, name: cleanCourse(c.fullname) })).sort((a, b) => a.name.localeCompare(b.name));
 
 export default async function Courses() {
-  const { mine, other, extra } = await getMyCourses(await requireUser());
+  const u = await requireUser();
+  const { mine, other, extra } = await getMyCourses(u);
   return (
     <>
-      <p className="text-[13px] text-muted md:text-sm">Semester III</p>
+      {u.college.sit && <p className="text-[13px] text-muted md:text-sm">Semester III</p>}
       <h1 className="text-[28px] leading-tight font-medium tracking-[-0.025em] md:text-[36px]">Courses</h1>
-      <p className="mt-2 mb-8 text-sm text-muted">The courses in your timetable, plus any you add from the list below.</p>
+      <p className="mt-2 mb-8 text-sm text-muted">{u.college.sit ? "The courses in your timetable, plus any you add from the list below." : "The courses you're enrolled in this term."}</p>
 
       <div className="list">
         {byName(mine).map((c) => (

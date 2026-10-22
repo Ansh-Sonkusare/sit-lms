@@ -10,3 +10,5 @@ export const LINKS = [
   { label: "Nagpur campus", href: "https://lms.sitnagpur.edu.in/pluginfile.php/30064/block_html/content/nagpur.html" },
   { label: "LMS support", href: "https://lms.sitnagpur.edu.in/user/contactsitesupport.php" },
 ];
+
+export const ATTENDANCE_URL = "https://lms.sitnagpur.edu.in/attendance-report/Student-Attendance/index.php";

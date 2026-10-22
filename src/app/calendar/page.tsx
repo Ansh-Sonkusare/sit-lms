@@ -1,11 +1,12 @@
+import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/session.ts";
-import { EVENTS, TEACHING, when } from "@/lib/calendar.ts";
-import { todayIST } from "@/lib/format.ts";
+import { EVENTS, TEACHING } from "@/lib/sit/calendar.ts";
+import { todayIST, when } from "@/lib/format.ts";
 
 const d = (iso: string, o: Intl.DateTimeFormatOptions) => new Date(`${iso}T00:00:00+05:30`).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", ...o });
 
 export default async function CalendarPage() {
-  await requireUser();
+  if (!(await requireUser()).college.sit) notFound();
   const today = todayIST();
   const months = Map.groupBy(EVENTS, (e) => d(e.start, { month: "long", year: "numeric" }));
   return (

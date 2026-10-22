@@ -41,10 +41,3 @@ export const holidayOn = (iso: string) => HOLIDAYS.find((h) => h.start <= iso &&
 export const isTeachingDay = (iso: string) => TEACHING.start <= iso && iso <= TEACHING.end && !holidayOn(iso);
 
 export const upcoming = (today: string, n = 5) => EVENTS.filter((e) => e.end >= today).slice(0, n);
-
-const fmt = (iso: string, o: Intl.DateTimeFormatOptions) =>
-  new Date(`${iso}T00:00:00+05:30`).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", ...o });
-export const when = (e: Pick<CalEvent, "start" | "end">) =>
-  e.start === e.end
-    ? fmt(e.start, { weekday: "short", day: "numeric", month: "short" })
-    : `${fmt(e.start, { day: "numeric", month: "short" })} to ${fmt(e.end, { day: "numeric", month: "short" })}`;

@@ -1,6 +1,4 @@
-import { SITE } from "@/lib/moodle.ts";
-import { ago, cleanHtml, cleanTitle, fmtDate, stripHtml } from "@/lib/format.ts";
-import { when } from "@/lib/calendar.ts";
+import { ago, cleanHtml, cleanTitle, fmtDate, stripHtml, when } from "@/lib/format.ts";
 import type { DigestItem } from "@/lib/digest.ts";
 import type { Announcement } from "@/lib/data.ts";
 
@@ -10,7 +8,7 @@ const time12 = (t: string) => {
 };
 
 // One announcement: the AI digest when there is one, the cleaned original behind "Show original" either way.
-export default function AnnouncementItem({ a, d, course, today }: { a: Announcement; d?: DigestItem; course?: string; today: string }) {
+export default function AnnouncementItem({ site, a, d, course, today }: { site: string; a: Announcement; d?: DigestItem; course?: string; today: string }) {
   const html = cleanHtml(a.message);
   return (
     <article className={`py-5 ${d && !d.forMe ? "opacity-60" : ""}`}>
@@ -49,7 +47,7 @@ export default function AnnouncementItem({ a, d, course, today }: { a: Announcem
       <details className="mt-3">
         <summary className="w-fit cursor-pointer text-[13px] text-accent">Show original</summary>
         <div className="prose-moodle mt-2 max-w-[680px] border-l-2 border-line pl-4 text-muted" dangerouslySetInnerHTML={{ __html: html }} />
-        <a href={`${SITE}/mod/forum/discuss.php?d=${a.discussion}`} target="_blank" className="link mt-2 inline-block text-[13px]">Open on the LMS</a>
+        <a href={`${site}/mod/forum/discuss.php?d=${a.discussion}`} target="_blank" className="link mt-2 inline-block text-[13px]">Open on the LMS</a>
       </details>
     </article>
   );

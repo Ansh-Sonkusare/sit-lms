@@ -4,16 +4,20 @@ import { redirect } from "next/navigation";
 import { refresh as refreshRoute } from "next/cache";
 import { call, clearCache, login as moodleLogin, MoodleError } from "@/lib/moodle.ts";
 import { getSession, requireUser } from "@/lib/session.ts";
+import { findCollege } from "@/lib/colleges.ts";
+import { cacheKey } from "@/lib/data.ts";
 import { getLeaves, saveLeaves, setExtraCourse, setUpdateDone } from "@/lib/prefs.ts";
 
 export async function login(_: string | null, form: FormData) {
   const username = String(form.get("username") ?? "").trim();
   const password = String(form.get("password") ?? "");
+  const college = findCollege(String(form.get("college") ?? ""));
+  if (!college) return "Pick your college.";
   try {
-    const { token } = await moodleLogin(username, password);
-    const info = await call(token, "core_webservice_get_site_info", {}, z.object({ userid: z.number(), fullname: z.string() }));
+    const { token } = await moodleLogin(college.url, username, password);
+    const info = await call(college.url, token, "core_webservice_get_site_info", {}, z.object({ userid: z.number(), fullname: z.string() }));
     const s = await getSession();
-    Object.assign(s, { token, userid: info.userid, fullname: info.fullname });
+    Object.assign(s, { college: college.id, token, userid: info.userid, fullname: info.fullname });
     await s.save();
   } catch (e) {
     return e instanceof MoodleError ? e.message : "Could not reach the LMS";
@@ -28,7 +32,7 @@ export async function logout() {
 
 export async function refresh() {
   const u = await requireUser();
-  clearCache(`${u.userid}:`);
+  clearCache(`${cacheKey(u)}:`);
   refreshRoute();
 }
 

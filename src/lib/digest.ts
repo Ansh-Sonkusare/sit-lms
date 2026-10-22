@@ -5,7 +5,8 @@ import { z } from "zod";
 import { after } from "next/server";
 import { readJson, writeJson } from "./store.ts";
 import { cleanCourse, cleanHtml, todayIST } from "./format.ts";
-import type { Announcement, Course } from "./data.ts";
+import { cacheKey, type Announcement, type Course } from "./data.ts";
+import type { User } from "./session.ts";
 
 // Plain text for the model, keeping link targets.
 const toText = (html: string) =>
@@ -34,12 +35,15 @@ const Item = z.strictObject({
     )
     .describe("Every concrete dated item in the announcement."),
   kind: z.enum(["assignment", "exam", "result", "resource", "schedule", "info"]).describe("result = marks or grades released; resource = study material or links shared"),
-  forMe: z.boolean().describe("False only if it clearly targets a different section or batch than section B / batch B1."),
+  forMe: z.boolean().describe("False only if it clearly targets a different section or batch than the student's."),
 });
 export type DigestItem = z.infer<typeof Item>;
 
-const SYSTEM = `You turn college LMS announcements into a clean digest for one student.
-Student: Symbiosis Institute of Technology, Nagpur. Semester III, section B, batch B1, odd semester 2026-27.
+const student = (u: User) =>
+  u.college.sit ? `${u.college.name}. Semester III, section B, batch B1, odd semester 2026-27.` : `${u.college.name}. Section and batch unknown, so treat every announcement as for them.`;
+
+const system = (u: User) => `You turn college LMS announcements into a clean digest for one student.
+Student: ${student(u)}
 Announcements are often pasted from Word or WhatsApp: ignore greetings, signatures, emoji, repeated headings and formatting noise.
 Resolve partial or relative dates ("by Friday", "22-24 Sept") against the posted date. Never invent a date that isn't stated.
 In summaries and actions write dates like "23 Oct" or "Fri 23 Oct", never YYYY-MM-DD.
@@ -50,7 +54,7 @@ const Out = z.strictObject({ items: z.array(Item) });
 const { $schema, ...OUT_SCHEMA } = z.toJSONSchema(Out);
 
 // Groq's free tier (OpenAI-compatible, strict JSON schema on gpt-oss) when GROQ_API_KEY is set; Claude otherwise.
-async function viaGroq(user: string) {
+async function viaGroq(system: string, user: string) {
   for (let attempt = 0; ; attempt++) {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -59,7 +63,7 @@ async function viaGroq(user: string) {
         model: process.env.GROQ_MODEL ?? "openai/gpt-oss-120b",
         reasoning_effort: "low",
         messages: [
-          { role: "system", content: SYSTEM },
+          { role: "system", content: system },
           { role: "user", content: user },
         ],
         response_format: { type: "json_schema", json_schema: { name: "digest", strict: true, schema: OUT_SCHEMA } },
@@ -76,14 +80,14 @@ async function viaGroq(user: string) {
   }
 }
 
-async function viaClaude(user: string) {
+async function viaClaude(system: string, user: string) {
   const res = await new Anthropic().beta.messages.parse({
     model: "claude-opus-5-5",
     max_tokens: 16000,
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     output_config: { effort: "low", format: betaZodOutputFormat(Out) },
-    system: SYSTEM,
+    system,
     messages: [{ role: "user", content: user }],
   });
   if (res.stop_reason === "refusal" || !res.parsed_output) throw new Error(`digest failed: ${res.stop_reason}`);
@@ -116,14 +120,14 @@ const STALE = 12 * 60 * 60_000; // re-read summaries this often even if unchange
 const KEEP = 60; // newest announcements kept in the cache
 
 const entryKey = (a: Announcement) => `${a.id}:${a.timemodified}`;
-const pathOf = (userid: number) => `digest/${userid}.json`;
-const running = new Map<number, Promise<void>>();
+const pathOf = (u: User) => `digest/${encodeURIComponent(cacheKey(u))}.json`;
+const running = new Map<string, Promise<void>>();
 
 export type Digest = { items: Map<number, DigestItem>; pending: number; updatedAt: number | null };
 
 // What's cached right now, without calling the AI. Stale entries are still shown until refreshed.
-export async function readDigest(userid: number, news: Announcement[]): Promise<Digest & { needs: Announcement[] }> {
-  const store = (await readJson<Store>(pathOf(userid)).catch(() => null)) ?? { items: {} };
+export async function readDigest(u: User, news: Announcement[]): Promise<Digest & { needs: Announcement[] }> {
+  const store = (await readJson<Store>(pathOf(u)).catch(() => null)) ?? { items: {} };
   const items = new Map<number, DigestItem>();
   const needs: Announcement[] = [];
   let updatedAt: number | null = null;
@@ -139,13 +143,14 @@ export async function readDigest(userid: number, news: Announcement[]): Promise<
 }
 
 // Summarize only what's new, changed or stale, then save. One run per user at a time.
-export function refreshDigest(userid: number, news: Announcement[], courses: Course[]): Promise<void> {
+export function refreshDigest(u: User, news: Announcement[], courses: Course[]): Promise<void> {
   const ask = process.env.GROQ_API_KEY ? viaGroq : process.env.ANTHROPIC_API_KEY ? viaClaude : null;
   if (!ask) return Promise.resolve();
-  const live = running.get(userid);
+  const key = cacheKey(u);
+  const live = running.get(key);
   if (live) return live;
   const job = (async () => {
-    const { needs } = await readDigest(userid, news);
+    const { needs } = await readDigest(u, news);
     if (!needs.length) return;
     const name = (id: number) => cleanCourse(courses.find((c) => c.id === id)?.fullname ?? "");
     const input = needs.map((a) => ({
@@ -158,18 +163,18 @@ export function refreshDigest(userid: number, news: Announcement[], courses: Cou
     }));
     // save after every batch so progress survives a cut-off background run
     const save = async (got: Map<number, DigestItem>) => {
-      const store = (await readJson<Store>(pathOf(userid)).catch(() => null)) ?? { items: {} };
+      const store = (await readJson<Store>(pathOf(u)).catch(() => null)) ?? { items: {} };
       for (const a of needs) {
         const d = got.get(a.id);
         if (d) store.items[entryKey(a)] = { at: Date.now(), d };
       }
       const keep = new Set(news.slice(0, KEEP).map(entryKey));
       for (const k of Object.keys(store.items)) if (!keep.has(k)) delete store.items[k];
-      await writeJson(pathOf(userid), store);
+      await writeJson(pathOf(u), store);
     };
     const got = new Map<number, DigestItem>();
     const run = async (part: typeof input) => {
-      const items = await ask(`Today is ${todayIST()}.\n\nAnnouncements:\n${JSON.stringify(part, null, 1)}`);
+      const items = await ask(system(u), `Today is ${todayIST()}.\n\nAnnouncements:\n${JSON.stringify(part, null, 1)}`);
       const fresh = new Map<number, DigestItem>();
       for (const it of items) if (part.some((p) => p.id === it.id)) fresh.set(it.id, it);
       fresh.forEach((v, k) => got.set(k, v));
@@ -179,14 +184,14 @@ export function refreshDigest(userid: number, news: Announcement[], courses: Cou
     // models occasionally skip an item; give the stragglers one more go
     for (const part of batches(input.filter((p) => !got.has(p.id)))) await run(part).catch(() => {});
     console.log(`[digest] saved ${got.size} of ${needs.length}`);
-  })().finally(() => running.delete(userid));
-  running.set(userid, job);
+  })().finally(() => running.delete(key));
+  running.set(key, job);
   return job;
 }
 
 // Pages call this: cached digest now, and a background refresh after the response if anything is missing.
-export async function getDigest(userid: number, news: Announcement[], courses: Course[]): Promise<Digest> {
-  const d = await readDigest(userid, news).catch(() => ({ items: new Map(), pending: 0, updatedAt: null, needs: [] }));
-  if (d.needs.length) after(() => refreshDigest(userid, news, courses).catch((e) => console.error("[digest]", e)));
+export async function getDigest(u: User, news: Announcement[], courses: Course[]): Promise<Digest> {
+  const d = await readDigest(u, news).catch(() => ({ items: new Map(), pending: 0, updatedAt: null, needs: [] }));
+  if (d.needs.length) after(() => refreshDigest(u, news, courses).catch((e) => console.error("[digest]", e)));
   return { items: d.items, pending: d.needs.filter((a) => !d.items.has(a.id)).length, updatedAt: d.updatedAt };
 }

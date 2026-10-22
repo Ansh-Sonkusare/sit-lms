@@ -1,9 +1,7 @@
 import { z } from "zod";
 
-export const SITE = process.env.MOODLE_URL ?? "https://lms.sitnagpur.edu.in";
-
 // Identify as the Moodle app, which some site plugins expect.
-export const UA = { "User-Agent": "MoodleMobile sit-lms" };
+export const UA = { "User-Agent": "MoodleMobile" };
 
 export class MoodleError extends Error {
   errorcode: string;
@@ -24,8 +22,8 @@ function flatten(obj: unknown, prefix = "", out = new URLSearchParams()) {
   return out;
 }
 
-export async function login(username: string, password: string) {
-  const res = await fetch(`${SITE}/login/token.php`, {
+export async function login(site: string, username: string, password: string) {
+  const res = await fetch(`${site}/login/token.php`, {
     method: "POST",
     headers: UA,
     body: new URLSearchParams({ username, password, service: "moodle_mobile_app" }),
@@ -36,12 +34,13 @@ export async function login(username: string, password: string) {
 }
 
 export async function call<S extends z.ZodType>(
+  site: string,
   token: string,
   wsfunction: string,
   params: Record<string, unknown>,
   schema: S,
 ): Promise<z.infer<S>> {
-  const url = `${SITE}/webservice/rest/server.php?moodlewsrestformat=json&wsfunction=${wsfunction}`;
+  const url = `${site}/webservice/rest/server.php?moodlewsrestformat=json&wsfunction=${wsfunction}`;
   const body = flatten(params);
   body.set("wstoken", token);
   const res = await fetch(url, { method: "POST", headers: UA, body, cache: "no-store" });

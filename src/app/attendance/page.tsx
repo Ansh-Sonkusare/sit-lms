@@ -1,14 +1,17 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/session.ts";
-import { getAttendance, ATTENDANCE_URL } from "@/lib/data.ts";
+import { notFound } from "next/navigation";
+import { getAttendance } from "@/lib/data.ts";
+import { ATTENDANCE_URL } from "@/lib/sit/links.ts";
 import { budget, budgetText, cleanCourse, countWord, TARGET, todayIST } from "@/lib/format.ts";
-import { remainingByCourse, TIMETABLED } from "@/lib/timetable.ts";
-import { TEACHING } from "@/lib/calendar.ts";
+import { remainingByCourse, TIMETABLED } from "@/lib/sit/timetable.ts";
+import { TEACHING } from "@/lib/sit/calendar.ts";
 import { Bar, sortRows } from "@/components/AttendanceRows.tsx";
 import { refresh } from "../actions.ts";
 
 export default async function AttendancePage() {
   const u = await requireUser();
+  if (!u.college.sit) notFound();
   const data = await getAttendance(u).catch(() => null);
   const rows = data ? sortRows(data.rows) : [];
   const { marked = 0, attended = 0, overall = 0 } = data ?? {};

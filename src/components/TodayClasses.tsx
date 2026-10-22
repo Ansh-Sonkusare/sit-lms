@@ -12,8 +12,8 @@ import {
   nextClassDay,
   remainingByCourse,
   TIMETABLED,
-} from "@/lib/timetable.ts";
-import { holidayOn } from "@/lib/calendar.ts";
+} from "@/lib/sit/timetable.ts";
+import { holidayOn } from "@/lib/sit/calendar.ts";
 
 const dayName = (iso: string) =>
   new Date(`${iso}T12:00:00+05:30`).toLocaleDateString("en-IN", {

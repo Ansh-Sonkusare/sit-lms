@@ -153,3 +153,10 @@ export function skipText(attended: number, marked: number, left?: number, n = 1)
   const safe = after >= TARGET && budget(attended, marked + n) >= 0;
   return { after, safe, then: budgetText(attended, marked + n, left) };
 }
+
+const fmtIso = (iso: string, o: Intl.DateTimeFormatOptions) =>
+  new Date(`${iso}T00:00:00+05:30`).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", ...o });
+export const when = (e: { start: string; end: string }) =>
+  e.start === e.end
+    ? fmtIso(e.start, { weekday: "short", day: "numeric", month: "short" })
+    : `${fmtIso(e.start, { day: "numeric", month: "short" })} to ${fmtIso(e.end, { day: "numeric", month: "short" })}`;

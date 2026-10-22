@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/session.ts";
 import { getDeadlines, getCourses, getAnnouncements, getAttendance, type Deadline } from "@/lib/data.ts";
-import { ago, budgetText, cleanTitle, cleanCourse, collapseDue, countWord, fmtTime, relDay, stripHtml, TARGET, todayIST } from "@/lib/format.ts";
-import { remainingByCourse } from "@/lib/timetable.ts";
-import { upcoming, when } from "@/lib/calendar.ts";
-import { LINKS } from "@/lib/links.ts";
+import { ago, budgetText, cleanTitle, cleanCourse, collapseDue, countWord, fmtTime, relDay, stripHtml, TARGET, todayIST, when } from "@/lib/format.ts";
+import { remainingByCourse } from "@/lib/sit/timetable.ts";
+import { upcoming } from "@/lib/sit/calendar.ts";
+import { LINKS } from "@/lib/sit/links.ts";
 import { getDigest } from "@/lib/digest.ts";
 import AttendanceRows from "@/components/AttendanceRows.tsx";
 import TodayClasses from "@/components/TodayClasses.tsx";
@@ -27,14 +27,15 @@ export default async function Today() {
   const u = await requireUser();
   const [lmsEvents, att, courses, news] = await Promise.all([
     getDeadlines(u),
-    getAttendance(u).catch((e: Error) => e),
+    u.college.sit ? getAttendance(u).catch((e: Error) => e) : null,
     getCourses(u),
     getAnnouncements(u).catch(() => []),
   ]);
+  const sit = !!u.college.sit;
   const attendance = att instanceof Error ? null : att;
   const now = new Date().getTime();
   // Dated items the AI digest found in announcements join the LMS's own deadlines (unless the LMS already has one that day).
-  const digest = (await getDigest(u.userid, news, courses)).items;
+  const digest = (await getDigest(u, news, courses)).items;
   const today = todayIST();
   const horizon = new Date(now + 14 * 86_400_000).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
   const fromNews: Deadline[] = news.flatMap((a) => {
@@ -75,9 +76,9 @@ export default async function Today() {
         {attPart}
       </h1>
 
-      <div className="mt-10 grid grid-cols-1 gap-14 md:mt-14 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] lg:gap-[72px]">
+      <div className={`mt-10 grid grid-cols-1 gap-14 md:mt-14 lg:gap-[72px] ${sit ? "lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]" : ""}`}>
         <div>
-          <TodayClasses today={today} attendance={attendance} />
+          {sit && <TodayClasses today={today} attendance={attendance} />}
           <section>
           <h2 className="h2">Due</h2>
           {events.length === 0 && <p className="mt-4 text-sm text-muted">Nothing due in the next two weeks.</p>}
@@ -115,7 +116,7 @@ export default async function Today() {
           </section>
         </div>
 
-        <aside>
+        {sit && <aside>
           <div className="flex items-baseline justify-between">
             <h2 className="h2">Attendance</h2>
             <Link href="/attendance" className="link text-[13px]">All {attendance?.rows.length ?? ""} courses</Link>
@@ -142,10 +143,10 @@ export default async function Today() {
               Attendance couldn&apos;t be loaded from the LMS. <Link href="/attendance" className="link">Try again</Link>
             </p>
           )}
-        </aside>
+        </aside>}
       </div>
 
-      <section className="mt-16 md:mt-[72px]">
+      {sit && <section className="mt-16 md:mt-[72px]">
         <div className="flex items-baseline justify-between">
           <h2 className="h2">Coming up</h2>
           <Link href="/calendar" className="link text-[13px]">Academic calendar</Link>
@@ -159,7 +160,7 @@ export default async function Today() {
             </div>
           ))}
         </div>
-      </section>
+      </section>}
 
       <section className="mt-16 md:mt-[72px]">
         <div className="flex items-baseline justify-between">
@@ -184,12 +185,12 @@ export default async function Today() {
         )}
       </section>
 
-      <footer className="mt-16 flex flex-wrap gap-x-5 gap-y-2 border-t border-line pt-5 text-[13px] md:mt-[72px]">
+      {sit && <footer className="mt-16 flex flex-wrap gap-x-5 gap-y-2 border-t border-line pt-5 text-[13px] md:mt-[72px]">
         <span className="text-muted">Portals</span>
         {LINKS.map((l) => (
           <a key={l.href} href={l.href} target="_blank" className="link">{l.label}</a>
         ))}
-      </footer>
+      </footer>}
     </>
   );
 }

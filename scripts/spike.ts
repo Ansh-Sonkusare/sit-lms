@@ -1,9 +1,10 @@
-// M1 spike: MOODLE_USERNAME=.. MOODLE_PASSWORD=.. node scripts/spike.ts
+// M1 spike: MOODLE_URL=https://lms.college.edu MOODLE_USERNAME=.. MOODLE_PASSWORD=.. node scripts/spike.ts
 import { z } from "zod";
 import { call, login } from "../src/lib/moodle.ts";
 
-const { token } = await login(process.env.MOODLE_USERNAME!, process.env.MOODLE_PASSWORD!);
-const info = await call(token, "core_webservice_get_site_info", {}, z.object({
+const site = process.env.MOODLE_URL!;
+const { token } = await login(site, process.env.MOODLE_USERNAME!, process.env.MOODLE_PASSWORD!);
+const info = await call(site, token, "core_webservice_get_site_info", {}, z.object({
   sitename: z.string(), release: z.string(), userid: z.number(), fullname: z.string(),
   functions: z.array(z.object({ name: z.string() })),
 }));
@@ -18,6 +19,6 @@ const needed = [
 for (const n of needed) console.log(fns.has(n) ? "  ok     " : "  MISSING", n);
 console.log("  attendance fns:", [...fns].filter((f) => f.startsWith("mod_attendance")).join(", ") || "none");
 const now = Math.floor(Date.now() / 1000);
-const ev = await call(token, "core_calendar_get_action_events_by_timesort",
+const ev = await call(site, token, "core_calendar_get_action_events_by_timesort",
   { timesortfrom: now, timesortto: now + 14 * 86400 }, z.object({ events: z.array(z.object({ name: z.string(), timesort: z.number() })) }));
 console.log(`deadlines (14d): ${ev.events.length}`);

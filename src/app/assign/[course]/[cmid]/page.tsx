@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/session.ts";
 import { getAssignment, getCourses } from "@/lib/data.ts";
-import { SITE } from "@/lib/moodle.ts";
 import { cleanCourse, fileExt, fileSize, fmtTime, relDay } from "@/lib/format.ts";
 
 const LABEL: Record<string, string> = { new: "Not submitted", submitted: "Submitted", draft: "Draft" };
@@ -57,8 +56,8 @@ export default async function Assignment({ params }: PageProps<"/assign/[course]
         </section>
       )}
       <div className="mt-8 flex flex-wrap gap-2">
-        <a href={`${SITE}/mod/assign/view.php?id=${cmid}&action=editsubmission`} target="_blank" className="inline-flex h-10 items-center rounded-lg bg-fg px-4 text-sm font-medium text-bg">Submit on the LMS</a>
-        <a href={`${SITE}/mod/assign/view.php?id=${cmid}`} target="_blank" className="btn h-10">Open on the LMS</a>
+        <a href={`${u.site}/mod/assign/view.php?id=${cmid}&action=editsubmission`} target="_blank" className="inline-flex h-10 items-center rounded-lg bg-fg px-4 text-sm font-medium text-bg">Submit on the LMS</a>
+        <a href={`${u.site}/mod/assign/view.php?id=${cmid}`} target="_blank" className="btn h-10">Open on the LMS</a>
       </div>
     </>
   );

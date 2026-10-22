@@ -1,6 +1,6 @@
 // Run: node scripts/check-timetable.ts
 import assert from "node:assert/strict";
-import { classesOn, daysBetween, missedByCourse, nextClassDay, remainingByCourse } from "../src/lib/timetable.ts";
+import { classesOn, daysBetween, missedByCourse, nextClassDay, remainingByCourse } from "../src/lib/sit/timetable.ts";
 import { skipText } from "../src/lib/format.ts";
 
 assert.equal(classesOn("2026-10-19")[0].subject, "CO"); // a Monday

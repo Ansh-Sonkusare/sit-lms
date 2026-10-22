@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { budgetText, cleanCourse, TARGET } from "@/lib/format.ts";
 import type { AttendanceRow } from "@/lib/data.ts";
-import { TIMETABLED } from "@/lib/timetable.ts";
+import { TIMETABLED } from "@/lib/sit/timetable.ts";
 
 export function Bar({ percent, className = "" }: { percent: number; className?: string }) {
   return (

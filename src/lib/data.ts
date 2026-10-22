@@ -3,15 +3,18 @@ import { z } from "zod";
 import { redirect } from "next/navigation";
 import { call, cached, MoodleError } from "./moodle.ts";
 import { getExtraCourses, getLeaves, type Leave } from "./prefs.ts";
-import { TIMETABLED } from "./timetable.ts";
-import type { User } from "./session";
+import { TIMETABLED } from "./sit/timetable.ts";
+import type { User } from "./session.ts";
 
 const MIN = 60_000;
 
+// Moodle user ids are per site, so every per-user key carries the site too.
+export const cacheKey = (u: Pick<User, "site" | "userid">) => `${u.site}|${u.userid}`;
+
 async function api<S extends z.ZodType>(u: User, fn: string, params: Record<string, unknown>, schema: S, ttl: number) {
-  const key = `${u.userid}:${fn}:${JSON.stringify(params)}`;
+  const key = `${cacheKey(u)}:${fn}:${JSON.stringify(params)}`;
   try {
-    return await cached(key, ttl, () => call(u.token, fn, params, schema));
+    return await cached(key, ttl, () => call(u.site, u.token, fn, params, schema));
   } catch (e) {
     if (e instanceof MoodleError && e.errorcode === "invalidtoken") redirect("/login?expired=1");
     throw e;
@@ -184,8 +187,6 @@ export async function getAssignment(u: User, courseid: number, cmid: number) {
   return { ...a, status };
 }
 
-export const ATTENDANCE_URL = "https://lms.sitnagpur.edu.in/attendance-report/Student-Attendance/index.php";
-
 const AttendanceResp = z.object({
   courses: z.array(
     z.object({ courseid: z.number(), coursename: z.string(), totalsessions: z.number(), attended: z.number(), percentage: z.number() }),
@@ -217,7 +218,7 @@ export async function sessionsOnLeave(u: User, leaves: Leave[]): Promise<LeaveSe
   return per.flat().sort((a, b) => a.date.localeCompare(b.date));
 }
 
-// The institute's attendance plugin covers every course ever taken; keep this semester's.
+// SIT's custom attendance plugin (mod_attendance_get_attendance, not core mod_attendance) covers every course ever taken; keep this semester's.
 // Leave credit: each session the LMS marked absent on a leave day counts as present.
 // `leaves` defaults to your accepted leave; pass [] for the LMS's raw numbers.
 export async function getAttendance(u: User, leaves?: Leave[]): Promise<Attendance> {
@@ -242,9 +243,9 @@ export async function getAttendance(u: User, leaves?: Leave[]): Promise<Attendan
   return { rows, marked, attended: sum("attended"), credited: sum("credited"), overall: marked ? (sum("attended") / marked) * 100 : 0 };
 }
 
-// Your courses: the ones in your timetable plus any you added; everything else is "other".
+// Your courses: at SIT the ones in your timetable plus any you added, everything else is "other"; elsewhere all of them.
 export async function getMyCourses(u: User) {
   const [all, extra] = await Promise.all([getCourses(u), getExtraCourses()]);
-  const mine = (c: Course) => TIMETABLED.has(c.id) || extra.includes(c.id);
+  const mine = (c: Course) => !u.college.sit || TIMETABLED.has(c.id) || extra.includes(c.id);
   return { mine: all.filter(mine), other: all.filter((c) => !mine(c)), extra: new Set(extra) };
 }

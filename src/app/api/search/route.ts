@@ -1,4 +1,4 @@
-import { getSession } from "@/lib/session.ts";
+import { currentUser } from "@/lib/session.ts";
 import { getCourseContents, getMyCourses } from "@/lib/data.ts";
 import { cleanCourse } from "@/lib/format.ts";
 
@@ -8,9 +8,8 @@ const file = (url: string) => `/api/file?url=${encodeURIComponent(url)}`;
 
 // Courses, files, tasks and links only; feedback forms, forums and attendance activities are noise here.
 export async function GET() {
-  const s = await getSession();
-  if (!s.token || !s.userid) return new Response("Unauthorized", { status: 401 });
-  const u = { token: s.token, userid: s.userid, fullname: s.fullname ?? "" };
+  const u = await currentUser();
+  if (!u) return new Response("Unauthorized", { status: 401 });
   const courses = (await getMyCourses(u)).mine;
   const per = await Promise.all(
     courses.map(async (c): Promise<SearchItem[]> => {

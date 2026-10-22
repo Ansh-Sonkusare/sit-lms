@@ -10,7 +10,6 @@ import {
   getAttendance,
   type Module,
 } from "@/lib/data.ts";
-import { SITE } from "@/lib/moodle.ts";
 import {
   ago,
   budgetText,
@@ -28,7 +27,7 @@ import CourseSearch from "@/components/CourseSearch.tsx";
 import CourseTabs from "@/components/CourseTabs.tsx";
 import AnnouncementItem from "@/components/AnnouncementItem.tsx";
 import { getDigest } from "@/lib/digest.ts";
-import { remainingByCourse, TIMETABLED } from "@/lib/timetable.ts";
+import { remainingByCourse, TIMETABLED } from "@/lib/sit/timetable.ts";
 
 const file = (url: string) => `/api/file?url=${encodeURIComponent(url)}`;
 const TASKS = new Set(["assign", "quiz"]);
@@ -178,11 +177,11 @@ export default async function Course({
     getAnnouncements(u).catch(() => []),
     getAssignments(u, cid).catch(() => []),
     getDeadlines(u).catch(() => []),
-    getAttendance(u).catch(() => null),
+    u.college.sit ? getAttendance(u).catch(() => null) : null,
   ]);
   const news = allNews.filter((x) => x.courseid === cid);
   // digest the full set so it shares the Updates page's cached result
-  const digest = (await getDigest(u.userid, allNews, courses)).items;
+  const digest = (await getDigest(u, allNews, courses)).items;
   const course = courses.find((c) => c.id === cid);
   const title = course ? cleanCourse(course.fullname) : `Course ${id}`;
   const attRow = att?.rows.find((r) => r.courseid === cid);
@@ -351,7 +350,7 @@ export default async function Course({
                 ) : (
                   <div className="list max-w-[720px] border-t-0">
                     {news.map((a) => (
-                      <AnnouncementItem key={a.id} a={a} d={digest.get(a.id)} today={todayIST()} />
+                      <AnnouncementItem key={a.id} site={u.site} a={a} d={digest.get(a.id)} today={todayIST()} />
                     ))}
                   </div>
                 ),
@@ -405,7 +404,7 @@ export default async function Course({
             </>
           )}
           <a
-            href={`${SITE}/course/view.php?id=${id}`}
+            href={`${u.site}/course/view.php?id=${id}`}
             target="_blank"
             className="link mt-9 inline-block text-[13px]"
           >
