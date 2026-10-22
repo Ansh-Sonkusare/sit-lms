@@ -131,8 +131,13 @@ const by = (name: string) => ({ college: SEED.college, name, now: new Date().toI
 const create = (name: string) => (doc: CollegeTimetables) => applySave(doc, { ...SEED, id: "new", name, updatedAt: "" }, by(name));
 {
   const s = memoryStore();
-  assert.deepEqual(await shared(s, create("Section A")), { ok: true, result: { ok: true, id: "section-a" } });
-  assert.deepEqual((await stored(s)).list.map((t) => t.id), [SEED.id, "section-a"], "a college with no document starts from the seed");
+  const r = await shared(s, create("Section A"));
+  assert.ok(r.ok && r.result?.ok && /^section-a-[0-9a-f]{6}$/.test(r.result.id), "a new timetable's id is its name and a random suffix");
+  assert.deepEqual((await stored(s)).list.map((t) => t.name), [SEED.name, "Section A"], "a college with no document starts from the seed");
+  const first = r.ok && r.result?.ok ? r.result.id : "";
+  await shared(s, (doc) => applyDelete(doc, first));
+  const again = await shared(s, create("Section A"));
+  assert.ok(again.ok && again.result?.ok && again.result.id !== first, "a re-created timetable gets a new id");
 }
 {
   const s = memoryStore();
@@ -155,7 +160,7 @@ const create = (name: string) => (doc: CollegeTimetables) => applySave(doc, { ..
   const edit = (doc: CollegeTimetables) => applySave(doc, { ...seed, name: "Renamed" }, by("A"));
   assert.deepEqual(await shared(racing, edit), { ok: true, result: { ok: true, id: SEED.id } });
   const after = await stored(s);
-  assert.deepEqual(after.list.map((t) => t.id), [SEED.id, "section-a", "section-c", "section-e"]);
+  assert.deepEqual(after.list.map((t) => t.name), ["Renamed", "Section A", "Section C", "Section E"]);
   assert.equal(after.list[0].name, "Renamed");
 
   // The stale-editor check runs again on the re-read document: B saved the seed in between, so A's save is refused.
@@ -173,9 +178,9 @@ const create = (name: string) => (doc: CollegeTimetables) => applySave(doc, { ..
   assert.equal((await stored(s)).list[0].name, "B's name");
 
   assert.deepEqual(await shared(s, (doc) => applyDelete(doc, SEED.id)), { ok: true, result: "This is the default. Make another timetable the default first." });
-  assert.deepEqual(await shared(s, (doc) => applyDefault(doc, "section-a")), { ok: true, result: null });
+  assert.deepEqual(await shared(s, (doc) => applyDefault(doc, after.list[1].id)), { ok: true, result: null });
   assert.deepEqual(await shared(s, (doc) => applyDelete(doc, SEED.id)), { ok: true, result: null });
-  assert.deepEqual((await stored(s)).list.map((t) => t.id), ["section-a", "section-c", "section-e"]);
+  assert.deepEqual((await stored(s)).list.map((t) => t.name), ["Section A", "Section C", "Section E"]);
 }
 {
   const s = memoryStore();

@@ -35,7 +35,8 @@ export const savedAt = (iso: string) => new Date(iso).toLocaleString("en-IN", { 
 export type Editor = { college: string; name: string | undefined; now: string };
 
 // `raw.updatedAt` must be the one the editor loaded, so a save never overwrites someone else's newer one.
-// A new timetable (id "new") gets an id from its name.
+// A new timetable (id "new") gets an id from its name and a random suffix, so a student's choice of a deleted
+// timetable never attaches to a new one with the same name.
 export function applySave(doc: CollegeTimetables, raw: unknown, by: Editor): Change<SaveResult> {
   const input = z.object({ id: z.string(), updatedAt: z.string() }).loose().safeParse(raw);
   if (!input.success) return { result: fail("The timetable could not be read. Reload the page.") };
@@ -50,8 +51,8 @@ export function applySave(doc: CollegeTimetables, raw: unknown, by: Editor): Cha
   let id = input.data.id;
   if (isNew) {
     const base = slugify(String((raw as { name?: unknown }).name ?? ""));
-    id = base;
-    for (let n = 2; RESERVED_IDS.includes(id) || doc.list.some((t) => t.id === id); n++) id = `${base}-${n}`;
+    do id = `${base}-${crypto.randomUUID().slice(0, 6)}`;
+    while (RESERVED_IDS.includes(id) || doc.list.some((t) => t.id === id));
   }
   const parsed = TimetableSchema.safeParse({
     ...(raw as object),
