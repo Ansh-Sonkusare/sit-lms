@@ -16,8 +16,9 @@ Built with Next.js 16 and TypeScript, on top of the official Moodle mobile web-s
 
 Colleges marked `sit: true` in `src/lib/colleges.ts` also get these. They rely on SIT's custom attendance plugin and hand-entered data in `src/lib/sit/`.
 
-- **Today's classes:** your timetable for today (or the next class day), with Now/Next. Tap a class to see what skipping it does to that course's attendance, and what skipping the whole day does overall.
-- **Attendance:** percentage per course from `mod_attendance`, with a 75% marker, the classes left before teaching ends, the best percentage you can still reach and what it takes ("Attend 4 of the 4 left").
+- **Today's classes:** your timetable for today (or the next class day), with Now/Next. Each class shows whether the LMS has marked it yet. Tap a class to see what skipping it does to that course's attendance, and what skipping the whole day does overall.
+- **Attendance:** percentage per course from `mod_attendance`, with a 75% marker, the classes left before teaching ends, the best percentage you can still reach and what it takes ("Attend 4 of the 4 left"). Classes are counted per timetable slot, because the LMS records one session per slot.
+- **Attendance by day:** pick a date on a calendar and see that day's classes with Present, Absent or Not marked, across all courses. Each course also has an Attendance tab with a month calendar and a list of dates that don't match your timetable: a class recorded on another day, a record on a day with no class, a class the LMS never marked. The comparison starts on the timetable's first day, 15 Sep.
 - **Leave record:** add leave days, then mark them accepted once the institute approves them. Accepted leave turns the LMS's absent marks on those days into presents in every number.
 - **Academic calendar** and portal links.
 

@@ -45,6 +45,7 @@ export default async function AttendancePage() {
           )}
         </div>
         <div className="flex gap-2">
+          <Link href="/attendance/day" className="btn">By day</Link>
           <Link href="/attendance/leave" className="btn">Leave</Link>
           <form action={refresh}><button className="btn">Refresh</button></form>
           <a className="btn" href={ATTENDANCE_URL} target="_blank">Open on the LMS</a>
@@ -124,7 +125,7 @@ export default async function AttendancePage() {
             </table>
           </div>
           <p className="mt-4 text-[13px] text-muted">
-            The tick on each bar marks 75%. Numbers come from the LMS attendance records. Classes left are counted from your B1 timetable up to the last teaching day, skipping holidays. Best is what you&apos;d reach by attending every class left. A dash means the course isn&apos;t in your timetable.
+            The tick on each bar marks 75%. Numbers come from the LMS attendance records. Classes left are counted per timetable slot (a two-hour lab is two classes, as the LMS records it) from your B1 timetable up to the last teaching day, skipping holidays. Best is what you&apos;d reach by attending every class left. A dash means the course isn&apos;t in your timetable.
           </p>
         </>
       )}

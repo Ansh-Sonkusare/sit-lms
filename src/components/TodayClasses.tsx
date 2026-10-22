@@ -6,7 +6,9 @@ import {
   time12,
   TARGET,
 } from "@/lib/format.ts";
+import Link from "next/link";
 import type { Attendance } from "@/lib/data.ts";
+import { dayClasses, statusLine, type CourseMarks } from "@/lib/sit/marks.ts";
 import {
   classesOn,
   nextClassDay,
@@ -27,9 +29,11 @@ const dayName = (iso: string) =>
 export default function TodayClasses({
   today,
   attendance,
+  marks,
 }: {
   today: string;
   attendance: Attendance | null;
+  marks?: Map<number, CourseMarks> | null;
 }) {
   const now = nowIST();
   const isToday = classesOn(today).some((c) => c.end > now);
@@ -37,6 +41,7 @@ export default function TodayClasses({
   if (!day) return null;
 
   const classes = classesOn(day);
+  const view = isToday && marks ? dayClasses(day, marks, today) : null;
   const left = remainingByCourse(day);
   const rowOf = (id: number | null) =>
     attendance?.rows.find((r) => r.courseid === id);
@@ -68,6 +73,7 @@ export default function TodayClasses({
       <div className="list mt-3">
         {classes.map((c, i) => {
           const r = rowOf(c.courseid);
+          const status = view && statusLine(view.classes[i].statuses);
           const past = isToday && i < current;
           const tag = i !== current ? null : c.start <= now ? "Now" : "Next";
           const head = (
@@ -87,6 +93,11 @@ export default function TodayClasses({
                 {tag && (
                   <span className="rounded-full bg-fg px-2 py-0.5 text-xs font-medium text-bg">
                     {tag}
+                  </span>
+                )}
+                {status && (
+                  <span className={status.tone === "bad" ? "text-bad" : "text-muted"}>
+                    {status.text}
                   </span>
                 )}
                 {r && (
@@ -148,6 +159,9 @@ export default function TodayClasses({
           ({countWord(counted).toLowerCase()} classes).
         </p>
       )}
+      <p className="mt-3 text-[13px]">
+        <Link href="/attendance/day" className="link">See every day</Link>
+      </p>
     </section>
   );
 }

@@ -8,6 +8,7 @@ import {
   getAssignments,
   getDeadlines,
   getAttendance,
+  getCourseMarks,
   type Module,
 } from "@/lib/data.ts";
 import {
@@ -27,7 +28,9 @@ import CourseSearch from "@/components/CourseSearch.tsx";
 import CourseTabs from "@/components/CourseTabs.tsx";
 import AnnouncementItem from "@/components/AnnouncementItem.tsx";
 import { getDigest } from "@/lib/digest.ts";
-import { remainingByCourse, TIMETABLED } from "@/lib/sit/timetable.ts";
+import MarksCalendar from "@/components/MarksCalendar.tsx";
+import { remainingByCourse, TIMETABLE_FROM, TIMETABLED } from "@/lib/sit/timetable.ts";
+import { dayLabel, dotsByDay, type CourseMarks } from "@/lib/sit/marks.ts";
 
 const file = (url: string) => `/api/file?url=${encodeURIComponent(url)}`;
 const TASKS = new Set(["assign", "quiz"]);
@@ -162,6 +165,25 @@ function NoteRow({ n }: { n: Note }) {
   );
 }
 
+// The records and missing classes that don't line up with the timetable, newest first.
+function oddDates(m: CourseMarks) {
+  const markText = (s: { mark: string; leave?: boolean }) => (s.mark === "P" ? (s.leave ? "present (leave)" : "present") : "absent");
+  const items = [
+    ...m.sessions.flatMap((s) =>
+      s.match === "moved"
+        ? [{ at: s.classDate!, text: `${dayLabel(s.classDate!)} class, recorded ${dayLabel(s.date)}: ${markText(s)}` }]
+        : s.match === "extra"
+          ? [{ at: s.date, text: `${dayLabel(s.date)}: ${markText(s)}, no class that day in your timetable` }]
+          : [],
+    ),
+    ...m.missing.map((x) => ({
+      at: x.date,
+      text: `${dayLabel(x.date)}: ${x.count > 1 ? `${x.count} classes ` : ""}not marked${x.pending ? " yet" : ""}`,
+    })),
+  ];
+  return items.sort((a, b) => b.at.localeCompare(a.at));
+}
+
 export default async function Course({
   params,
   searchParams,
@@ -171,13 +193,14 @@ export default async function Course({
   const u = await requireUser();
   const cid = Number(id);
   const now = new Date().getTime();
-  const [courses, sections, allNews, assigns, deadlines, att] = await Promise.all([
+  const [courses, sections, allNews, assigns, deadlines, att, marks] = await Promise.all([
     getCourses(u),
     getCourseContents(u, cid).catch(() => notFound()),
     getAnnouncements(u).catch(() => []),
     getAssignments(u, cid).catch(() => []),
     getDeadlines(u).catch(() => []),
     u.college.sit ? getAttendance(u).catch(() => null) : null,
+    u.college.sit ? getCourseMarks(u, cid).catch(() => null) : null,
   ]);
   const news = allNews.filter((x) => x.courseid === cid);
   // digest the full set so it shares the Updates page's cached result
@@ -223,11 +246,14 @@ export default async function Course({
     { key: "announcements", label: "Announcements", count: news.length },
   ];
 
-  // open on the first tab that has something in it
+  // open on the first tab that has something in it; Attendance is added after, so it is never the default
   const tab =
     typeof requested === "string"
       ? requested
       : (tabs.find((t) => t.count > 0)?.key ?? "notes");
+  const showMarks = marks && (TIMETABLED.has(cid) || marks.sessions.length > 0);
+  if (showMarks) tabs.push({ key: "attendance", label: "Attendance", count: marks.sessions.length });
+  const odd = marks ? oddDates(marks) : [];
 
   return (
     <>
@@ -354,6 +380,34 @@ export default async function Course({
                     ))}
                   </div>
                 ),
+              attendance: showMarks ? (
+                <div className="mt-6 max-w-[760px]">
+                  <p className="text-sm">
+                    {attRow
+                      ? `${attRow.attended} of ${attRow.marked} marked classes attended.`
+                      : `${marks.sessions.filter((s) => s.mark === "P").length} of ${marks.sessions.length} marked classes attended.`}{" "}
+                    <span className="text-muted">Tap a day to see every class that day.</span>
+                  </p>
+                  <div className="mt-6">
+                    <MarksCalendar dots={dotsByDay([marks])} today={todayIST()} href={(d) => `/attendance/day?date=${d}`} />
+                  </div>
+                  {odd.length > 0 && (
+                    <>
+                      <h2 className="h2 mt-10">Dates that don&apos;t match your timetable</h2>
+                      <ul className="list mt-3 text-sm">
+                        {odd.map((o, i) => (
+                          <li key={i} className="py-2.5">
+                            {o.text}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                  <p className="mt-6 text-[13px] text-muted">
+                    The comparison with your timetable starts on {dayLabel(TIMETABLE_FROM)}. Earlier records are shown as the LMS has them.
+                  </p>
+                </div>
+              ) : null,
             }}
           />
         </div>

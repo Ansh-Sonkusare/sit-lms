@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/session.ts";
-import { getDeadlines, getCourses, getAnnouncements, getAttendance, type Deadline } from "@/lib/data.ts";
+import { getDeadlines, getCourses, getAnnouncements, getAttendance, getAllMarks, type Deadline } from "@/lib/data.ts";
 import { ago, budgetText, cleanTitle, cleanCourse, collapseDue, countWord, fmtTime, relDay, stripHtml, TARGET, todayIST, when } from "@/lib/format.ts";
 import { remainingByCourse } from "@/lib/sit/timetable.ts";
 import { upcoming } from "@/lib/sit/calendar.ts";
@@ -25,9 +25,10 @@ function dayLabel(e: Deadline) {
 
 export default async function Today() {
   const u = await requireUser();
-  const [lmsEvents, att, courses, news] = await Promise.all([
+  const [lmsEvents, att, marks, courses, news] = await Promise.all([
     getDeadlines(u),
     u.college.sit ? getAttendance(u).catch((e: Error) => e) : null,
+    u.college.sit ? getAllMarks(u).catch(() => null) : null,
     getCourses(u),
     getAnnouncements(u).catch(() => []),
   ]);
@@ -78,7 +79,7 @@ export default async function Today() {
 
       <div className={`mt-10 grid grid-cols-1 gap-14 md:mt-14 lg:gap-[72px] ${sit ? "lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]" : ""}`}>
         <div>
-          {sit && <TodayClasses today={today} attendance={attendance} />}
+          {sit && <TodayClasses today={today} attendance={attendance} marks={marks} />}
           <section>
           <h2 className="h2">Due</h2>
           {events.length === 0 && <p className="mt-4 text-sm text-muted">Nothing due in the next two weeks.</p>}
