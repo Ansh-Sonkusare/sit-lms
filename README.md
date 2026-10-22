@@ -14,12 +14,14 @@ Built with Next.js 16 and TypeScript, on top of the official Moodle mobile web-s
 
 ### SIT Nagpur extras
 
-Colleges marked `sit: true` in `src/lib/colleges.ts` also get these. They rely on SIT's custom attendance plugin and hand-entered data in `src/lib/sit/`.
+Colleges marked `sit: true` in `src/lib/colleges.ts` also get these. They rely on SIT's custom attendance plugin, the academic calendar in `src/lib/sit/calendar.ts`, and the timetables that admins keep in the app.
 
 - **Today's classes:** your timetable for today (or the next class day), with Now/Next. Each class shows whether the LMS has marked it yet. Tap a class to see what skipping it does to that course's attendance, and what skipping the whole day does overall.
 - **Attendance:** percentage per course from `mod_attendance`, with a 75% marker, the classes left before teaching ends, the best percentage you can still reach and what it takes ("Attend 4 of the 4 left"). Classes are counted per timetable slot, because the LMS records one session per slot.
-- **Attendance by day:** pick a date on a calendar and see that day's classes with Present, Absent or Not marked, across all courses. Each course also has an Attendance tab with a month calendar and a list of dates that don't match your timetable: a class recorded on another day, a record on a day with no class, a class the LMS never marked. The comparison starts on the timetable's first day, 15 Sep.
+- **Attendance by day:** pick a date on a calendar and see that day's classes with Present, Absent or Not marked, across all courses. Each course also has an Attendance tab with a month calendar and a list of dates that don't match your timetable: a class recorded on another day, a record on a day with no class, a class the LMS never marked. The comparison starts on your timetable's first day.
 - **Leave record:** add leave days, then mark them accepted once the institute approves them. Accepted leave turns the LMS's absent marks on those days into presents in every number.
+- **Timetables:** each section and batch can have its own timetable. Students pick theirs on the Timetable page (account menu, then "Your timetable"). The option that best matches the attendance the LMS recorded for them is marked Suggested, once they have at least 10 records. Until they pick, they get the college default, and a note says so.
+- **Your own copy:** a student can copy their timetable and change it with the same editor admins use. The copy no longer gets admin changes; the page says when the original was updated after the copy was made. "Discard my copy" goes back to the original.
 - **Academic calendar** and portal links.
 
 ## How it works
@@ -35,7 +37,13 @@ Browser ──> Next.js server (token in encrypted cookie) ──> Moodle mobile
 
 Each college is one entry in `src/lib/colleges.ts`: an id, a name and its Moodle URL. The session remembers which college you signed into, and every API call, link and file proxy uses that site. To add colleges without a code change, set `COLLEGES` to a JSON array of the same shape. The site needs Moodle's mobile web services enabled, which is the default for any site the Moodle app works with.
 
-The SIT timetable, batch and academic calendar (semester 3, section B, batch B1) are hard-coded in `src/lib/sit/`.
+### Timetables
+
+A timetable is data, not code. `src/lib/sit/timetable.ts` defines its shape (name, start date, batches, slot times, and one block per class with its slots, subject, room, batch and LMS course) and `TimetableSchema`, which checks it every time one is read or saved. Two classes for the same students cannot share a slot.
+
+Admins are named in `ADMINS` as `<college id>:<Moodle user id>`, for example `sit-nagpur:1809`. An admin gets "Manage timetables" in the account menu. There they can create a timetable (blank, or a copy of another section's), edit it with one form per weekday, delete it, and pick the college default. The server checks admin rights again on every change. If two admins edit the same timetable, the second save fails with a message instead of overwriting the first.
+
+Shared timetables are stored as `timetables/<college>.json` in the Blob store. Personal copies are stored as `timetables/personal/<college>/<user id>.json`. The student's choice is in their preferences cookie. Until an admin saves a timetable, SIT Nagpur gets the built-in Semester III, Section B timetable (`SEED`). Without `BLOB_READ_WRITE_TOKEN`, all of this is kept in memory and is lost on restart.
 
 ## Running it
 
@@ -53,7 +61,8 @@ npm run dev
 | `GROQ_API_KEY` | no | Turns on the announcement digest. Free tier at [console.groq.com](https://console.groq.com) |
 | `GROQ_MODEL` | no | Defaults to `openai/gpt-oss-120b` |
 | `ANTHROPIC_API_KEY` | no | Uses Claude for the digest when no Groq key is set |
-| `BLOB_READ_WRITE_TOKEN` | no | Caches digests in Vercel Blob across restarts; without it they're cached in memory |
+| `BLOB_READ_WRITE_TOKEN` | no | Keeps timetables and digests in Vercel Blob across restarts; without it they're kept in memory |
+| `ADMINS` | no | Who can manage timetables: `<college id>:<Moodle user id>`, comma-separated, e.g. `sit-nagpur:1809` |
 | `COLLEGES` | no | Extra colleges for the login dropdown, e.g. `[{"id":"x","name":"X College","url":"https://lms.x.edu"}]` |
 
 Without an AI key, announcements show as cleaned-up text.
@@ -64,6 +73,8 @@ Without an AI key, announcements show as cleaned-up text.
 npx tsc --noEmit && npm run lint
 node scripts/check-timetable.ts   # timetable, holidays, leave credit
 node scripts/check-format.ts      # text cleanup and wording
+node scripts/check-marks.ts       # LMS records compared with the timetable
+node scripts/check-timetables.ts  # timetable validation and the Suggested pick
 ```
 
 `scripts/spike.ts` signs in to `MOODLE_URL` with `MOODLE_USERNAME` / `MOODLE_PASSWORD` from `.env.local` and lists which web-service functions your token can call.
