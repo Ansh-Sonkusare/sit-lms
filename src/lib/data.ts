@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { call, cached, MoodleError } from "./moodle.ts";
 import { getExtraCourses, getLeaves, type Leave } from "./prefs.ts";
 import { TIMETABLED } from "./sit/timetable.ts";
+import { applyLeave, reconcile, type CourseMarks } from "./sit/marks.ts";
+import { todayIST } from "./format.ts";
 import type { User } from "./session.ts";
 
 const MIN = 60_000;
@@ -241,6 +243,28 @@ export async function getAttendance(u: User, leaves?: Leave[]): Promise<Attendan
   const sum = (k: "marked" | "attended" | "credited") => rows.reduce((s, x) => s + x[k], 0);
   const marked = sum("marked");
   return { rows, marked, attended: sum("attended"), credited: sum("credited"), overall: marked ? (sum("attended") / marked) * 100 : 0 };
+}
+
+// Per course: what the LMS recorded checked against the timetable, with accepted leave applied like getAttendance does.
+export async function getCourseMarks(u: User, courseid: number): Promise<CourseMarks> {
+  const [sessions, leaves] = await Promise.all([getSessions(u, courseid), getLeaves().then((l) => l.filter((x) => x.accepted))]);
+  return reconcile(courseid, applyLeave(sessions, leaves), todayIST());
+}
+
+// Every timetabled course of this semester. A course whose records fail to load is left out, so it shows no status instead of "not marked".
+export async function getAllMarks(u: User): Promise<Map<number, CourseMarks>> {
+  const [courses, leaves] = await Promise.all([getCourses(u), getLeaves().then((l) => l.filter((x) => x.accepted))]);
+  const today = todayIST();
+  const per = await Promise.all(
+    courses
+      .filter((c) => TIMETABLED.has(c.id))
+      .map((c) =>
+        getSessions(u, c.id)
+          .then((ss) => [c.id, reconcile(c.id, applyLeave(ss, leaves), today)] as const)
+          .catch(() => null),
+      ),
+  );
+  return new Map(per.filter((x) => x !== null));
 }
 
 // Your courses: at SIT the ones in your timetable plus any you added, everything else is "other"; elsewhere all of them.
