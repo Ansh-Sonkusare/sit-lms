@@ -88,16 +88,16 @@ export default function TodayClasses({
                     .filter(Boolean)
                     .join(" · ")}
                 </span>
+                {status && (
+                  <span className={`mt-0.5 block text-[13px] ${status.tone === "bad" ? "text-bad" : "text-muted"}`}>
+                    {status.text}
+                  </span>
+                )}
               </span>
               <span className="flex items-baseline gap-2.5 text-[13px]">
                 {tag && (
                   <span className="rounded-full bg-fg px-2 py-0.5 text-xs font-medium text-bg">
                     {tag}
-                  </span>
-                )}
-                {status && (
-                  <span className={status.tone === "bad" ? "text-bad" : "text-muted"}>
-                    {status.text}
                   </span>
                 )}
                 {r && (

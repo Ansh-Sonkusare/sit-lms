@@ -11,7 +11,6 @@ import MarksCalendar from "@/components/MarksCalendar.tsx";
 const isDate = (s: unknown): s is string => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s)) && new Date(s).toISOString().startsWith(s);
 const isMonth = (s: unknown): s is string => typeof s === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(s);
 
-const monthName = (ym: string) => new Date(`${ym}-01T00:00:00Z`).toLocaleDateString("en-IN", { timeZone: "UTC", month: "long", year: "numeric" });
 const shiftMonth = (ym: string, by: number) => {
   const d = new Date(`${ym}-01T00:00:00Z`);
   d.setUTCMonth(d.getUTCMonth() + by);
@@ -69,8 +68,7 @@ export default async function AttendanceDay({ searchParams }: PageProps<"/attend
       {!marks && <p className="mt-6 text-sm text-bad">Attendance couldn&apos;t be loaded from the LMS. Try again in a moment.</p>}
 
       <div className="mt-8 max-w-[760px]">
-        <div className="flex items-center justify-between text-sm">
-          <span className="font-medium">{monthName(month)}</span>
+        <div className="flex items-center justify-end text-sm">
           <span className="flex gap-4">
             {month > first ? <Link href={`${href(date)}&month=${shiftMonth(month, -1)}`} className="link">Earlier</Link> : null}
             {month < last.slice(0, 7) ? <Link href={`${href(date)}&month=${shiftMonth(month, 1)}`} className="link">Later</Link> : null}
