@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { budgetText, cleanCourse, TARGET } from "@/lib/format.ts";
 import type { AttendanceRow } from "@/lib/data.ts";
-import { TIMETABLED } from "@/lib/sit/timetable.ts";
 
 export function Bar({ percent, className = "" }: { percent: number; className?: string }) {
   return (
@@ -15,7 +14,8 @@ export function Bar({ percent, className = "" }: { percent: number; className?: 
 export const sortRows = (rows: AttendanceRow[]) => [...rows].sort((a, b) => a.percent - b.percent);
 
 // Compact list for the Today sidebar.
-export default function AttendanceRows({ rows, left, limit }: { rows: AttendanceRow[]; left: Map<number, number>; limit?: number }) {
+// `timetabled`: courses in your timetable; for others the classes left are unknown.
+export default function AttendanceRows({ rows, left, timetabled, limit }: { rows: AttendanceRow[]; left: Map<number, number>; timetabled: Set<number>; limit?: number }) {
   return (
     <div className="list">
       {sortRows(rows).slice(0, limit).map((r) => {
@@ -26,7 +26,7 @@ export default function AttendanceRows({ rows, left, limit }: { rows: Attendance
               <span className={`font-medium ${r.percent < TARGET ? "text-bad" : ""}`}>{r.percent.toFixed(1)}%</span>
             </span>
             <Bar percent={r.percent} className="mt-2" />
-            <span className="mt-1.5 block text-xs text-muted">{budgetText(r.attended, r.marked, TIMETABLED.has(r.courseid) ? (left.get(r.courseid) ?? 0) : undefined)}</span>
+            <span className="mt-1.5 block text-xs text-muted">{budgetText(r.attended, r.marked, timetabled.has(r.courseid) ? (left.get(r.courseid) ?? 0) : undefined)}</span>
           </Link>
         );
       })}

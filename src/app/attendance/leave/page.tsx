@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/session.ts";
 import { getAttendance, sessionsOnLeave } from "@/lib/data.ts";
 import { getLeaves } from "@/lib/prefs.ts";
-import { classesOn, daysBetween } from "@/lib/sit/timetable.ts";
+import { classesOn, daysBetween, scheduleLabel } from "@/lib/sit/timetable.ts";
+import { getSchedule } from "@/lib/timetables.ts";
 import { holidayOn, TEACHING } from "@/lib/sit/calendar.ts";
 import { cleanCourse, todayIST, TARGET, when } from "@/lib/format.ts";
 import { removeLeave, setLeaveAccepted } from "../../actions.ts";
@@ -11,7 +12,8 @@ import AddLeaveForm from "@/components/AddLeaveForm.tsx";
 
 export default async function LeavePage() {
   const u = await requireUser();
-  if (!u.college.sit) notFound();
+  const schedule = (await getSchedule(u))?.schedule;
+  if (!schedule) notFound();
   const today = todayIST();
   const leaves = await getLeaves();
   const [lms, now, all, sessions] = await Promise.all([
@@ -54,7 +56,7 @@ export default async function LeavePage() {
                 // past days: the LMS's recorded sessions; days still ahead: the timetable
                 const recorded = sessions.filter((x) => l.from <= x.date && x.date <= l.to);
                 const absent = recorded.filter((x) => x.mark === "A").length;
-                const ahead = ds.filter((d) => d >= today).flatMap((d) => classesOn(d).filter((c) => c.courseid).map((c) => ({ d, ...c })));
+                const ahead = ds.filter((d) => d >= today).flatMap((d) => classesOn(schedule, d).filter((c) => c.courseid).map((c) => ({ d, ...c })));
                 const holidays = [...new Set(ds.map((d) => holidayOn(d)?.name).filter(Boolean))];
                 const upcoming = l.from >= today;
                 return (
@@ -146,7 +148,7 @@ export default async function LeavePage() {
           )}
           <p className="mt-6 text-[13px] leading-relaxed text-muted">
             Credit comes from the LMS&apos;s own records: only sessions it marked absent on your leave days turn into present, so nothing is
-            counted twice. Days still ahead are previewed from your B1 timetable. Your leave record is saved in this browser and stays after you sign out.
+            counted twice. Days still ahead are previewed from your timetable ({scheduleLabel(schedule)}). Your leave record is saved in this browser and stays after you sign out.
           </p>
         </section>
       </div>

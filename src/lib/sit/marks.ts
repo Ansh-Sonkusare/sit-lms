@@ -1,10 +1,10 @@
 import { TEACHING } from "./calendar.ts";
-import { classesOn, daysBetween, TIMETABLE_FROM, TIMETABLED, type ClassBlock, type Leave } from "./timetable.ts";
+import { classesOn, coursesOf, daysBetween, type ClassBlock, type Leave, type Schedule } from "./timetable.ts";
 
 // A session the LMS recorded. `leave`: an absence turned into present by accepted leave.
 export type Rec = { date: string; mark: string; leave?: boolean };
 // class: on a date the timetable has this course. moved: paired with an unrecorded class on classDate.
-// extra: no class to pair with. untracked: before TIMETABLE_FROM (or a course outside the timetable), nothing to compare.
+// extra: no class to pair with. untracked: before the timetable starts (or a course outside it), nothing to compare.
 export type RecordMatch = "class" | "moved" | "extra" | "untracked";
 export type MarkedSession = Rec & { match: RecordMatch; classDate?: string };
 export type MissingClass = { date: string; count: number; pending: boolean }; // pending: date === today
@@ -20,22 +20,23 @@ export const applyLeave = (sessions: { date: string; mark: string }[], leaves: L
 
 // Compare what the LMS recorded for one course against the timetable, slot by slot.
 // Records stay on their LMS date; pairing only labels them with the class they most likely belong to.
-export function reconcile(courseid: number, recs: Rec[], today: string): CourseMarks {
+export function reconcile(schedule: Schedule, courseid: number, recs: Rec[], today: string): CourseMarks {
   const sorted = [...recs].sort((a, b) => a.date.localeCompare(b.date));
   const sessions: MarkedSession[] = [];
-  if (!TIMETABLED.has(courseid)) return { sessions: sorted.map((r) => ({ ...r, match: "untracked" })), missing: [] };
+  const start = schedule.timetable.from;
+  if (!coursesOf(schedule).has(courseid)) return { sessions: sorted.map((r) => ({ ...r, match: "untracked" })), missing: [] };
 
   const last = today < TEACHING.end ? today : TEACHING.end;
   const slotsOn = new Map<string, number>();
-  if (last >= TIMETABLE_FROM)
-    for (const d of daysBetween(TIMETABLE_FROM, last)) {
-      const n = classesOn(d).reduce((s, c) => (c.courseid === courseid ? s + c.slots : s), 0);
+  if (last >= start)
+    for (const d of daysBetween(start, last)) {
+      const n = classesOn(schedule, d).reduce((s, c) => (c.courseid === courseid ? s + c.slots : s), 0);
       if (n) slotsOn.set(d, n);
     }
 
   const byDate = new Map<string, Rec[]>();
   for (const r of sorted) {
-    if (r.date < TIMETABLE_FROM) sessions.push({ ...r, match: "untracked" });
+    if (r.date < start) sessions.push({ ...r, match: "untracked" });
     else if (r.date > last) sessions.push({ ...r, match: "extra" });
     else byDate.set(r.date, [...(byDate.get(r.date) ?? []), r]);
   }
@@ -76,8 +77,8 @@ export type DayRecord = { courseid: number; mark: string; leave: boolean; match:
 // `tracked` is false before the timetable's first day: no classes to compare, only what the LMS recorded.
 export type DayView = { tracked: boolean; classes: DayClass[]; others: DayRecord[] };
 
-export function dayClasses(date: string, marks: Map<number, CourseMarks>, today: string): DayView {
-  const tracked = date >= TIMETABLE_FROM;
+export function dayClasses(schedule: Schedule, date: string, marks: Map<number, CourseMarks>, today: string): DayView {
+  const tracked = date >= schedule.timetable.from;
   const others = [...marks].flatMap(([courseid, m]) =>
     m.sessions.filter((s) => s.date === date && s.match !== "class").map((s) => ({ courseid, mark: s.mark, leave: !!s.leave, match: s.match, classDate: s.classDate })),
   );
@@ -98,7 +99,7 @@ export function dayClasses(date: string, marks: Map<number, CourseMarks>, today:
     for (let i = 0; i < (miss?.count ?? 0); i++) mine.push({ kind: "missing", pending: miss!.pending });
     return mine;
   };
-  const classes = classesOn(date).map((c): DayClass => {
+  const classes = classesOn(schedule, date).map((c): DayClass => {
     if (c.courseid === null) return { ...c, statuses: [] };
     if (date > today) return { ...c, statuses: Array.from({ length: c.slots }, (): SlotStatus => ({ kind: "upcoming" })) };
     if (!pools.has(c.courseid)) pools.set(c.courseid, poolOf(c.courseid));

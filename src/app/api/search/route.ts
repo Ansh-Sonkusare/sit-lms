@@ -1,5 +1,6 @@
 import { currentUser } from "@/lib/session.ts";
 import { getCourseContents, getMyCourses } from "@/lib/data.ts";
+import { getSchedule } from "@/lib/timetables.ts";
 import { cleanCourse } from "@/lib/format.ts";
 
 export type SearchItem = { title: string; subtitle: string; href: string; kind: "Course" | "File" | "Task" | "Quiz" | "Link" };
@@ -10,7 +11,7 @@ const file = (url: string) => `/api/file?url=${encodeURIComponent(url)}`;
 export async function GET() {
   const u = await currentUser();
   if (!u) return new Response("Unauthorized", { status: 401 });
-  const courses = (await getMyCourses(u)).mine;
+  const courses = (await getMyCourses(u, (await getSchedule(u))?.schedule ?? null)).mine;
   const per = await Promise.all(
     courses.map(async (c): Promise<SearchItem[]> => {
       const name = cleanCourse(c.fullname);

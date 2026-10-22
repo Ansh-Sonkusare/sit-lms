@@ -29,7 +29,8 @@ import CourseTabs from "@/components/CourseTabs.tsx";
 import AnnouncementItem from "@/components/AnnouncementItem.tsx";
 import { getDigest } from "@/lib/digest.ts";
 import MarksCalendar from "@/components/MarksCalendar.tsx";
-import { remainingByCourse, TIMETABLE_FROM, TIMETABLED } from "@/lib/sit/timetable.ts";
+import { coursesOf, remainingByCourse } from "@/lib/sit/timetable.ts";
+import { getSchedule } from "@/lib/timetables.ts";
 import { dayLabel, dotsByDay, type CourseMarks } from "@/lib/sit/marks.ts";
 
 const file = (url: string) => `/api/file?url=${encodeURIComponent(url)}`;
@@ -192,6 +193,8 @@ export default async function Course({
   const requested = (await searchParams).tab;
   const u = await requireUser();
   const cid = Number(id);
+  const schedule = (await getSchedule(u))?.schedule ?? null;
+  const timetabled = schedule ? coursesOf(schedule) : new Set<number>();
   const now = new Date().getTime();
   const [courses, sections, allNews, assigns, deadlines, att, marks] = await Promise.all([
     getCourses(u),
@@ -200,7 +203,7 @@ export default async function Course({
     getAssignments(u, cid).catch(() => []),
     getDeadlines(u).catch(() => []),
     u.college.sit ? getAttendance(u).catch(() => null) : null,
-    u.college.sit ? getCourseMarks(u, cid).catch(() => null) : null,
+    schedule ? getCourseMarks(u, schedule, cid).catch(() => null) : null,
   ]);
   const news = allNews.filter((x) => x.courseid === cid);
   // digest the full set so it shares the Updates page's cached result
@@ -251,7 +254,7 @@ export default async function Course({
     typeof requested === "string"
       ? requested
       : (tabs.find((t) => t.count > 0)?.key ?? "notes");
-  const showMarks = marks && (TIMETABLED.has(cid) || marks.sessions.length > 0);
+  const showMarks = schedule && marks && (timetabled.has(cid) || marks.sessions.length > 0);
   if (showMarks) tabs.push({ key: "attendance", label: "Attendance", count: marks.sessions.length });
   const odd = marks ? oddDates(marks) : [];
 
@@ -261,7 +264,7 @@ export default async function Course({
         <Link href="/courses" className="hover:underline">
           Courses
         </Link>{" "}
-        / Semester III
+        {schedule && ` / ${schedule.timetable.name}`}
       </p>
       <h1 className="mt-2 text-[28px] leading-tight font-medium tracking-[-0.025em] md:text-[36px]">
         {title}
@@ -404,7 +407,7 @@ export default async function Course({
                     </>
                   )}
                   <p className="mt-6 text-[13px] text-muted">
-                    The comparison with your timetable starts on {dayLabel(TIMETABLE_FROM)}. Earlier records are shown as the LMS has them.
+                    The comparison with your timetable starts on {dayLabel(schedule.timetable.from)}. Earlier records are shown as the LMS has them.
                   </p>
                 </div>
               ) : null,
@@ -424,7 +427,7 @@ export default async function Course({
               <p className="mt-1 text-[13px] leading-normal text-muted">
                 {attRow.attended} of {attRow.marked} classes.{" "}
                 {(() => {
-                  const t = budgetText(attRow.attended, attRow.marked, TIMETABLED.has(cid) ? (remainingByCourse(todayIST()).get(cid) ?? 0) : undefined);
+                  const t = budgetText(attRow.attended, attRow.marked, schedule && timetabled.has(cid) ? (remainingByCourse(schedule, todayIST()).get(cid) ?? 0) : undefined);
                   return t.startsWith("Attend") ? `${t} to reach 75%.` : `${t}.`;
                 })()}
               </p>

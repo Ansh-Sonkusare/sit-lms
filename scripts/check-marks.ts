@@ -1,6 +1,11 @@
 // Run: node scripts/check-marks.ts
 import assert from "node:assert/strict";
-import { applyLeave, dayClasses, dotsByDay, reconcile, statusLine, type CourseMarks } from "../src/lib/sit/marks.ts";
+import { applyLeave, dayClasses as dayClassesOf, dotsByDay, reconcile as reconcileOf, statusLine, type CourseMarks, type Rec } from "../src/lib/sit/marks.ts";
+import { SEED } from "../src/lib/sit/timetable.ts";
+
+const b1 = { timetable: SEED, batch: "B1" };
+const reconcile = (id: number, recs: Rec[], today: string) => reconcileOf(b1, id, recs, today);
+const dayClasses = (date: string, marks: Map<number, CourseMarks>, today: string) => dayClassesOf(b1, date, marks, today);
 
 const missingOn = (m: CourseMarks, date: string) => m.missing.find((x) => x.date === date);
 const P = (date: string) => ({ date, mark: "P" });

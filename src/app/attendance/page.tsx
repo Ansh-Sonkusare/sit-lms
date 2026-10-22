@@ -4,24 +4,27 @@ import { notFound } from "next/navigation";
 import { getAttendance } from "@/lib/data.ts";
 import { ATTENDANCE_URL } from "@/lib/sit/links.ts";
 import { budget, budgetText, cleanCourse, countWord, TARGET, todayIST } from "@/lib/format.ts";
-import { remainingByCourse, TIMETABLED } from "@/lib/sit/timetable.ts";
+import { coursesOf, remainingByCourse, scheduleLabel } from "@/lib/sit/timetable.ts";
+import { getSchedule } from "@/lib/timetables.ts";
 import { TEACHING } from "@/lib/sit/calendar.ts";
 import { Bar, sortRows } from "@/components/AttendanceRows.tsx";
 import { refresh } from "../actions.ts";
 
 export default async function AttendancePage() {
   const u = await requireUser();
-  if (!u.college.sit) notFound();
+  const schedule = (await getSchedule(u))?.schedule;
+  if (!schedule) notFound();
   const data = await getAttendance(u).catch(() => null);
   const rows = data ? sortRows(data.rows) : [];
   const { marked = 0, attended = 0, overall = 0 } = data ?? {};
   const low = rows.filter((r) => r.percent < TARGET).length;
   const b = budget(attended, marked);
-  const leftBy = remainingByCourse(todayIST());
+  const leftBy = remainingByCourse(schedule, todayIST());
+  const timetabled = coursesOf(schedule);
   const left = rows.reduce((s, r) => s + (leftBy.get(r.courseid) ?? 0), 0);
   const endLabel = new Date(`${TEACHING.end}T00:00:00+05:30`).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
   const best = (a: number, m: number, l: number) => (m + l ? ((a + l) / (m + l)) * 100 : 0);
-  const leftOf = (id: number) => (TIMETABLED.has(id) ? (leftBy.get(id) ?? 0) : undefined);
+  const leftOf = (id: number) => (timetabled.has(id) ? (leftBy.get(id) ?? 0) : undefined);
   const unreachable = rows.filter((r) => leftOf(r.courseid) !== undefined && -budget(r.attended, r.marked) > leftOf(r.courseid)!).length;
 
   return (
@@ -125,7 +128,7 @@ export default async function AttendancePage() {
             </table>
           </div>
           <p className="mt-4 text-[13px] text-muted">
-            The tick on each bar marks 75%. Numbers come from the LMS attendance records. Classes left are counted per timetable slot (a two-hour lab is two classes, as the LMS records it) from your B1 timetable up to the last teaching day, skipping holidays. Best is what you&apos;d reach by attending every class left. A dash means the course isn&apos;t in your timetable.
+            The tick on each bar marks 75%. Numbers come from the LMS attendance records. Classes left are counted per timetable slot (a two-hour lab is two classes, as the LMS records it) from your timetable ({scheduleLabel(schedule)}) up to the last teaching day, skipping holidays. Best is what you&apos;d reach by attending every class left. A dash means the course isn&apos;t in your timetable.
           </p>
         </>
       )}

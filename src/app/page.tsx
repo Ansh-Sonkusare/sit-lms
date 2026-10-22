@@ -2,7 +2,8 @@ import Link from "next/link";
 import { requireUser } from "@/lib/session.ts";
 import { getDeadlines, getCourses, getAnnouncements, getAttendance, getAllMarks, type Deadline } from "@/lib/data.ts";
 import { ago, budgetText, cleanTitle, cleanCourse, collapseDue, countWord, fmtTime, relDay, stripHtml, TARGET, todayIST, when } from "@/lib/format.ts";
-import { remainingByCourse } from "@/lib/sit/timetable.ts";
+import { coursesOf, remainingByCourse } from "@/lib/sit/timetable.ts";
+import { getSchedule } from "@/lib/timetables.ts";
 import { upcoming } from "@/lib/sit/calendar.ts";
 import { LINKS } from "@/lib/sit/links.ts";
 import { getDigest } from "@/lib/digest.ts";
@@ -25,10 +26,11 @@ function dayLabel(e: Deadline) {
 
 export default async function Today() {
   const u = await requireUser();
+  const schedule = (await getSchedule(u))?.schedule ?? null;
   const [lmsEvents, att, marks, courses, news] = await Promise.all([
     getDeadlines(u),
     u.college.sit ? getAttendance(u).catch((e: Error) => e) : null,
-    u.college.sit ? getAllMarks(u).catch(() => null) : null,
+    schedule ? getAllMarks(u, schedule).catch(() => null) : null,
     getCourses(u),
     getAnnouncements(u).catch(() => []),
   ]);
@@ -60,7 +62,7 @@ export default async function Today() {
   const dueWeek = events.filter((e) => !e.overdue && e.timesort * 1000 - now < 7 * 86_400_000).length;
   const low = attendance?.rows.filter((r) => r.percent < TARGET).length;
   const { marked = 0, attended = 0, overall = null } = attendance ?? {};
-  const left = remainingByCourse(todayIST());
+  const left = schedule ? remainingByCourse(schedule, todayIST()) : new Map<number, number>();
   const totalLeft = attendance?.rows.reduce((s, r) => s + (left.get(r.courseid) ?? 0), 0) ?? 0;
 
   const duePart = dueWeek === 0 ? "Nothing is due this week" : `${countWord(dueWeek)} ${dueWeek === 1 ? "thing is" : "things are"} due this week`;
@@ -79,7 +81,7 @@ export default async function Today() {
 
       <div className={`mt-10 grid grid-cols-1 gap-14 md:mt-14 lg:gap-[72px] ${sit ? "lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]" : ""}`}>
         <div>
-          {sit && <TodayClasses today={today} attendance={attendance} marks={marks} />}
+          {schedule && <TodayClasses schedule={schedule} today={today} attendance={attendance} marks={marks} />}
           <section>
           <h2 className="h2">Due</h2>
           {events.length === 0 && <p className="mt-4 text-sm text-muted">Nothing due in the next two weeks.</p>}
@@ -136,7 +138,7 @@ export default async function Today() {
                 })()}
               </p>
               <div className="mt-7">
-                <AttendanceRows rows={attendance.rows} left={left} limit={5} />
+                <AttendanceRows rows={attendance.rows} left={left} timetabled={schedule ? coursesOf(schedule) : new Set()} limit={5} />
               </div>
             </>
           ) : (

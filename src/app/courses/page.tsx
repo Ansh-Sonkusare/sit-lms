@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/session.ts";
 import { getMyCourses, type Course } from "@/lib/data.ts";
+import { getSchedule } from "@/lib/timetables.ts";
 import { cleanCourse } from "@/lib/format.ts";
 import { toggleCourse } from "../actions.ts";
 
@@ -8,12 +9,13 @@ const byName = (cs: Course[]) => cs.map((c) => ({ ...c, name: cleanCourse(c.full
 
 export default async function Courses() {
   const u = await requireUser();
-  const { mine, other, extra } = await getMyCourses(u);
+  const schedule = (await getSchedule(u))?.schedule ?? null;
+  const { mine, other, extra } = await getMyCourses(u, schedule);
   return (
     <>
-      {u.college.sit && <p className="text-[13px] text-muted md:text-sm">Semester III</p>}
+      {schedule && <p className="text-[13px] text-muted md:text-sm">{schedule.timetable.name}</p>}
       <h1 className="text-[28px] leading-tight font-medium tracking-[-0.025em] md:text-[36px]">Courses</h1>
-      <p className="mt-2 mb-8 text-sm text-muted">{u.college.sit ? "The courses in your timetable, plus any you add from the list below." : "The courses you're enrolled in this term."}</p>
+      <p className="mt-2 mb-8 text-sm text-muted">{schedule ? "The courses in your timetable, plus any you add from the list below." : "The courses you're enrolled in this term."}</p>
 
       <div className="list">
         {byName(mine).map((c) => (

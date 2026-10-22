@@ -4,7 +4,8 @@ import { requireUser } from "@/lib/session.ts";
 import { getAllMarks, getCourses } from "@/lib/data.ts";
 import { cleanCourse, time12, todayIST } from "@/lib/format.ts";
 import { holidayOn, TEACHING } from "@/lib/sit/calendar.ts";
-import { classesOn, daysBetween, TIMETABLE_FROM } from "@/lib/sit/timetable.ts";
+import { classesOn, daysBetween } from "@/lib/sit/timetable.ts";
+import { getSchedule } from "@/lib/timetables.ts";
 import { dayClasses, dayLabel, dotsByDay, statusLine, type DayRecord } from "@/lib/sit/marks.ts";
 import MarksCalendar from "@/components/MarksCalendar.tsx";
 
@@ -28,7 +29,9 @@ function otherText(o: DayRecord) {
 
 export default async function AttendanceDay({ searchParams }: PageProps<"/attendance/day">) {
   const u = await requireUser();
-  if (!u.college.sit) notFound();
+  const schedule = (await getSchedule(u))?.schedule;
+  if (!schedule) notFound();
+  const start = schedule.timetable.from;
   const q = await searchParams;
   const today = todayIST();
   const date = isDate(q.date) ? q.date : today;
@@ -36,14 +39,14 @@ export default async function AttendanceDay({ searchParams }: PageProps<"/attend
   const month = isMonth(q.month) ? q.month : date.slice(0, 7);
   const first = TEACHING.start.slice(0, 7);
 
-  const [marks, courses] = await Promise.all([getAllMarks(u).catch(() => null), getCourses(u).catch(() => [])]);
+  const [marks, courses] = await Promise.all([getAllMarks(u, schedule).catch(() => null), getCourses(u).catch(() => [])]);
   const name = (id: number | null) => {
     const c = courses.find((x) => x.id === id);
     return c ? cleanCourse(c.fullname) : null;
   };
-  const view = marks ? dayClasses(date, marks, today) : null;
+  const view = marks ? dayClasses(schedule, date, marks, today) : null;
 
-  const classDays = daysBetween(TIMETABLE_FROM, TEACHING.end).filter((d) => classesOn(d).length > 0);
+  const classDays = daysBetween(start, TEACHING.end).filter((d) => classesOn(schedule, d).length > 0);
   const prev = classDays.findLast((d) => d < date);
   const next = classDays.find((d) => d > date);
   const holiday = holidayOn(date);
@@ -84,7 +87,7 @@ export default async function AttendanceDay({ searchParams }: PageProps<"/attend
           <h2 className="h2">Classes</h2>
           {!view.tracked ? (
             <p className="mt-3 text-sm text-muted">
-              The timetable for this date isn&apos;t known. Your timetable starts on {dayLabel(TIMETABLE_FROM)}, so there is nothing to compare with.
+              The timetable for this date isn&apos;t known. Your timetable starts on {dayLabel(start)}, so there is nothing to compare with.
             </p>
           ) : view.classes.length === 0 ? (
             <p className="mt-3 text-sm text-muted">{holiday ? `No classes (${holiday.name}).` : "No classes this day."}</p>

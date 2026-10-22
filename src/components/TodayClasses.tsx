@@ -11,9 +11,10 @@ import type { Attendance } from "@/lib/data.ts";
 import { dayClasses, statusLine, type CourseMarks } from "@/lib/sit/marks.ts";
 import {
   classesOn,
+  coursesOf,
   nextClassDay,
   remainingByCourse,
-  TIMETABLED,
+  type Schedule,
 } from "@/lib/sit/timetable.ts";
 import { holidayOn } from "@/lib/sit/calendar.ts";
 
@@ -27,22 +28,25 @@ const dayName = (iso: string) =>
 
 // Today's timetable (or the next day with classes), with "Now"/"Next" and, per class, what skipping it costs.
 export default function TodayClasses({
+  schedule,
   today,
   attendance,
   marks,
 }: {
+  schedule: Schedule;
   today: string;
   attendance: Attendance | null;
   marks?: Map<number, CourseMarks> | null;
 }) {
   const now = nowIST();
-  const isToday = classesOn(today).some((c) => c.end > now);
-  const day = isToday ? today : nextClassDay(nextDay(today));
+  const isToday = classesOn(schedule, today).some((c) => c.end > now);
+  const day = isToday ? today : nextClassDay(schedule, nextDay(today));
   if (!day) return null;
 
-  const classes = classesOn(day);
-  const view = isToday && marks ? dayClasses(day, marks, today) : null;
-  const left = remainingByCourse(day);
+  const classes = classesOn(schedule, day);
+  const view = isToday && marks ? dayClasses(schedule, day, marks, today) : null;
+  const left = remainingByCourse(schedule, day);
+  const timetabled = coursesOf(schedule);
   const rowOf = (id: number | null) =>
     attendance?.rows.find((r) => r.courseid === id);
   const current = isToday ? classes.findIndex((c) => c.end > now) : -1;
@@ -57,7 +61,7 @@ export default function TodayClasses({
     ? null
     : holiday
       ? `No classes today (${holiday.name}).`
-      : classesOn(today).length
+      : classesOn(schedule, today).length
         ? "Today's classes are over."
         : "No classes today.";
 
@@ -120,7 +124,7 @@ export default function TodayClasses({
           const s = skipText(
             r.attended,
             r.marked,
-            TIMETABLED.has(r.courseid)
+            timetabled.has(r.courseid)
               ? (left.get(r.courseid) ?? 0)
               : undefined,
             c.slots,

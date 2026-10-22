@@ -3,7 +3,7 @@ import { z } from "zod";
 import { redirect } from "next/navigation";
 import { call, cached, MoodleError } from "./moodle.ts";
 import { getExtraCourses, getLeaves, type Leave } from "./prefs.ts";
-import { TIMETABLED } from "./sit/timetable.ts";
+import { coursesOf, type Schedule } from "./sit/timetable.ts";
 import { applyLeave, reconcile, type CourseMarks } from "./sit/marks.ts";
 import { todayIST } from "./format.ts";
 import type { User } from "./session.ts";
@@ -246,30 +246,32 @@ export async function getAttendance(u: User, leaves?: Leave[]): Promise<Attendan
 }
 
 // Per course: what the LMS recorded checked against the timetable, with accepted leave applied like getAttendance does.
-export async function getCourseMarks(u: User, courseid: number): Promise<CourseMarks> {
+export async function getCourseMarks(u: User, s: Schedule, courseid: number): Promise<CourseMarks> {
   const [sessions, leaves] = await Promise.all([getSessions(u, courseid), getLeaves().then((l) => l.filter((x) => x.accepted))]);
-  return reconcile(courseid, applyLeave(sessions, leaves), todayIST());
+  return reconcile(s, courseid, applyLeave(sessions, leaves), todayIST());
 }
 
 // Every timetabled course of this semester. A course whose records fail to load is left out, so it shows no status instead of "not marked".
-export async function getAllMarks(u: User): Promise<Map<number, CourseMarks>> {
+export async function getAllMarks(u: User, s: Schedule): Promise<Map<number, CourseMarks>> {
   const [courses, leaves] = await Promise.all([getCourses(u), getLeaves().then((l) => l.filter((x) => x.accepted))]);
   const today = todayIST();
+  const timetabled = coursesOf(s);
   const per = await Promise.all(
     courses
-      .filter((c) => TIMETABLED.has(c.id))
+      .filter((c) => timetabled.has(c.id))
       .map((c) =>
         getSessions(u, c.id)
-          .then((ss) => [c.id, reconcile(c.id, applyLeave(ss, leaves), today)] as const)
+          .then((ss) => [c.id, reconcile(s, c.id, applyLeave(ss, leaves), today)] as const)
           .catch(() => null),
       ),
   );
   return new Map(per.filter((x) => x !== null));
 }
 
-// Your courses: at SIT the ones in your timetable plus any you added, everything else is "other"; elsewhere all of them.
-export async function getMyCourses(u: User) {
+// Your courses: with a timetable the ones in it plus any you added, everything else is "other"; without one all of them.
+export async function getMyCourses(u: User, s: Schedule | null) {
   const [all, extra] = await Promise.all([getCourses(u), getExtraCourses()]);
-  const mine = (c: Course) => !u.college.sit || TIMETABLED.has(c.id) || extra.includes(c.id);
+  const timetabled = s ? coursesOf(s) : null;
+  const mine = (c: Course) => !timetabled || timetabled.has(c.id) || extra.includes(c.id);
   return { mine: all.filter(mine), other: all.filter((c) => !mine(c)), extra: new Set(extra) };
 }
