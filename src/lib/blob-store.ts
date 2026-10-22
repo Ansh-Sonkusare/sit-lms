@@ -7,7 +7,8 @@ export const blobStore: DocStore = {
     const res = await get(safePath(path), { access: "private", useCache: false });
     if (!res) return null;
     if (res.statusCode !== 200) throw new Error(`${path}: unexpected status ${res.statusCode}`);
-    return parseDoc(path, await new Response(res.stream).text(), res.blob.etag);
+    // A compressed response carries a weak etag (W/"…"), and put() refuses it as ifMatch, so every save of a larger document conflicted.
+    return parseDoc(path, await new Response(res.stream).text(), res.blob.etag.replace(/^W\//, ""));
   },
   async write(path, value, expect) {
     const body = JSON.stringify(value);

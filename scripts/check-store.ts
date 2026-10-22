@@ -27,6 +27,8 @@ blobHost.intercept(getOf("a.json")).reply(200, "{not json", json);
 await assert.rejects(blobStore.read("a.json"), /not valid JSON/);
 blobHost.intercept(getOf("a.json")).reply(200, '{"x":1}', json);
 assert.deepEqual(await blobStore.read("a.json"), { value: { x: 1 }, etag: '"e1"' });
+blobHost.intercept(getOf("a.json")).reply(200, '{"x":1}', { headers: { "content-type": "application/json", etag: 'W/"e1"' } });
+assert.equal((await blobStore.read("a.json"))?.etag, '"e1"', "a weak etag from a compressed read is usable as ifMatch");
 
 const putPath = (p: string) => p.startsWith("/api/blob/?pathname=a.json");
 api.intercept({ path: putPath, method: "PUT" }).reply(412, { error: { code: "precondition_failed", message: "etag mismatch" } });

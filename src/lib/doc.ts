@@ -77,5 +77,6 @@ export async function update<R>(store: DocStore, path: string, change: (current:
     }
     if (wrote === "ok") return { ok: true, result: c.result };
   }
+  console.warn(`${path}: still conflicting after ${tries} tries; nothing written`);
   return { ok: false, reason: "conflict" };
 }
