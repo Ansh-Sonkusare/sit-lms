@@ -7,7 +7,7 @@ import { getSession, requireUser } from "@/lib/session.ts";
 import { findCollege } from "@/lib/colleges.ts";
 import { cacheKey } from "@/lib/data.ts";
 import { getLeaves, saveLeaves, setExtraCourse, setTimetableChoice, setUpdateDone } from "@/lib/prefs.ts";
-import { deleteShared, isAdmin, loadShared, optionsOf, saveShared, setDefault } from "@/lib/timetables.ts";
+import { deleteShared, discardPersonal, isAdmin, makePersonal, optionsFor, savePersonal, saveShared, setDefault } from "@/lib/timetables.ts";
 import type { FieldError } from "@/lib/sit/timetable.ts";
 
 export async function login(_: string | null, form: FormData) {
@@ -80,8 +80,7 @@ export async function toggleUpdateDone(id: number, done: boolean) {
 export async function chooseTimetable(form: FormData) {
   const u = await requireUser();
   const [id, batch = ""] = String(form.get("choice") ?? "").split("|");
-  const doc = u.college.sit ? await loadShared(u.college.id) : null;
-  const option = optionsOf(doc?.list ?? []).find((o) => o.timetable.id === id && (o.batch ?? "") === batch);
+  const option = (await optionsFor(u)).find((o) => o.timetable.id === id && (o.batch ?? "") === batch);
   if (!option) return;
   await setTimetableChoice({ id, batch: option.batch });
   refreshRoute();
@@ -121,4 +120,21 @@ export async function makeDefaultTimetable(id: string) {
   if (!u) return;
   await setDefault(u, id);
   refreshRoute();
+}
+
+export async function makeMyTimetableCopy() {
+  await makePersonal(await requireUser());
+  redirect("/timetable/edit");
+}
+
+export async function discardMyTimetableCopy() {
+  await discardPersonal(await requireUser());
+  refreshRoute();
+}
+
+export async function savePersonalTimetable(_: FieldError[] | null, form: FormData): Promise<FieldError[] | null> {
+  const u = await requireUser();
+  const r = await savePersonal(u, parseJson(form));
+  if (!r.ok) return r.errors;
+  redirect("/timetable");
 }

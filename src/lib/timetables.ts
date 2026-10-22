@@ -3,7 +3,7 @@ import { cache } from "react";
 import { z } from "zod";
 import { cached, clearCache } from "./moodle.ts";
 import { readJson, writeJson } from "./store.ts";
-import { getTimetableChoice } from "./prefs.ts";
+import { getTimetableChoice, setTimetableChoice } from "./prefs.ts";
 import { getCourses, getSessions } from "./data.ts";
 import { coursesOf, fieldErrors, RESERVED_IDS, SEED, slugify, TimetableSchema, type FieldError, type Schedule, type Timetable } from "./sit/timetable.ts";
 import { rankSchedules, suggestion } from "./sit/suggest.ts";
@@ -50,22 +50,45 @@ async function writeShared(college: string, doc: CollegeTimetables) {
 export const optionsOf = (list: Timetable[]): Schedule[] =>
   list.flatMap((t): Schedule[] => (t.batches.length ? t.batches.map((batch) => ({ timetable: t, batch })) : [{ timetable: t, batch: null }]));
 
-const fits = (t: Timetable, batch: string | null) => (t.batches.length ? batch !== null && t.batches.includes(batch) : batch === null);
+// What this student can choose from: the shared timetables, then their own copy if they have one.
+export async function optionsFor(u: User): Promise<Schedule[]> {
+  if (!u.college.sit) return [];
+  const [doc, personal] = await Promise.all([loadShared(u.college.id), loadPersonal(u.college.id, u.userid)]);
+  return optionsOf([...(doc?.list ?? []), ...(personal ? [personal] : [])]);
+}
+
+const fits =(t: Timetable, batch: string | null) => (t.batches.length ? batch !== null && t.batches.includes(batch) : batch === null);
+
+// A student's own copy: id "personal", owner set. It no longer follows changes to the one it was copied from.
+const personalPath = (college: string, userid: number) => `timetables/personal/${college}/${userid}.json`;
+
+export const loadPersonal = (college: string, userid: number) =>
+  cached(memoKey(personalPath(college, userid)), TTL, async () => {
+    const raw = await readJson(personalPath(college, userid));
+    const r = raw === null ? null : TimetableSchema.safeParse(raw);
+    if (r && !r.success) console.error(`${personalPath(college, userid)}: unreadable`, r.error.message);
+    return r?.success ? r.data : null;
+  });
+
+async function writePersonal(college: string, userid: number, t: Timetable | null) {
+  await writeJson(personalPath(college, userid), t);
+  clearCache(memoKey(personalPath(college, userid)));
+}
 
 // Keyed by primitives so every requireUser() in one request shares the result.
-const scheduleOf = cache(async (college: string): Promise<ScheduleInfo | null> => {
+const scheduleOf = cache(async (college: string, userid: number): Promise<ScheduleInfo | null> => {
   const doc = await loadShared(college);
   if (!doc) return null;
   const choice = await getTimetableChoice();
-  const picked = doc.list.find((t) => t.id === choice?.id);
-  if (choice && picked && fits(picked, choice.batch)) return { schedule: { timetable: picked, batch: choice.batch }, chosen: true, personal: false };
+  const picked = choice?.id === "personal" ? await loadPersonal(college, userid) : doc.list.find((t) => t.id === choice?.id);
+  if (choice && picked && fits(picked, choice.batch)) return { schedule: { timetable: picked, batch: choice.batch }, chosen: true, personal: choice.id === "personal" };
   const fallback = doc.list.find((t) => t.id === doc.defaultId)!;
   return { schedule: { timetable: fallback, batch: fallback.batches[0] ?? null }, chosen: false, personal: false };
 });
 
 // The timetable this student follows; null where the college has no timetables.
 // A choice whose timetable or batch is gone falls back to the default, with chosen false.
-export const getSchedule = async (u: User) => (u.college.sit ? scheduleOf(u.college.id) : null);
+export const getSchedule = async (u: User) => (u.college.sit ? scheduleOf(u.college.id, u.userid) : null);
 
 // Which option best matches the attendance the LMS recorded for you; null without enough records.
 export async function suggestedOption(u: User, options: Schedule[]): Promise<number | null> {
@@ -127,4 +150,49 @@ export async function setDefault(u: User, id: string) {
   const doc = parseShared(u.college.id, await readJson(sharedPath(u.college.id)));
   if (!doc || !doc.list.some((t) => t.id === id)) return;
   await writeShared(u.college.id, { ...doc, defaultId: id });
+}
+
+// Copies the timetable you follow now into your own copy and switches you to it.
+export async function makePersonal(u: User) {
+  const info = await getSchedule(u);
+  if (!info || info.personal) return;
+  const t = info.schedule.timetable;
+  const copy: Timetable = { ...t, id: "personal", owner: u.userid, basedOn: t.id, basedOnAt: t.updatedAt, updatedAt: new Date().toISOString(), updatedBy: u.fullname || undefined };
+  await writePersonal(u.college.id, u.userid, copy);
+  await setTimetableChoice({ id: "personal", batch: info.schedule.batch });
+}
+
+// Like saveShared, for the caller's own copy. Owner and origin are kept from the stored copy, never taken from the form.
+export async function savePersonal(u: User, raw: unknown): Promise<SaveResult> {
+  const stored = TimetableSchema.safeParse(await readJson(personalPath(u.college.id, u.userid)));
+  if (!stored.success) return fail("You have no copy of your own. Make one from your timetable page.");
+  const input = z.object({ updatedAt: z.string() }).loose().safeParse(raw);
+  if (!input.success) return fail("The timetable could not be read. Reload the page.");
+  if (stored.data.updatedAt !== input.data.updatedAt)
+    return fail(`Your copy was saved at ${savedAt(stored.data.updatedAt)}, after you opened it (maybe in another tab). Reload to see that version; these changes are not saved.`);
+  const parsed = TimetableSchema.safeParse({
+    ...(raw as object),
+    id: "personal",
+    college: u.college.id,
+    owner: u.userid,
+    basedOn: stored.data.basedOn,
+    basedOnAt: stored.data.basedOnAt,
+    updatedAt: new Date().toISOString(),
+    updatedBy: u.fullname || undefined,
+  });
+  if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
+  await writePersonal(u.college.id, u.userid, parsed.data);
+  const choice = await getTimetableChoice();
+  if (choice?.id === "personal" && !fits(parsed.data, choice.batch)) await setTimetableChoice({ id: "personal", batch: parsed.data.batches[0] ?? null });
+  return { ok: true, id: "personal" };
+}
+
+// Deletes your copy. If you were using it, you go back to the timetable it came from when that still exists.
+export async function discardPersonal(u: User) {
+  const copy = await loadPersonal(u.college.id, u.userid);
+  await writePersonal(u.college.id, u.userid, null);
+  const choice = await getTimetableChoice();
+  if (choice?.id !== "personal") return;
+  const source = (await loadShared(u.college.id))?.list.find((t) => t.id === copy?.basedOn);
+  await setTimetableChoice(source && fits(source, choice.batch) ? { id: source.id, batch: choice.batch } : null);
 }
