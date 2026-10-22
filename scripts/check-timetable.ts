@@ -9,8 +9,11 @@ assert.equal(classesOn("2026-10-24").length, 0); // Saturday
 assert.deepEqual(daysBetween("2026-10-30", "2026-11-02"), ["2026-10-30", "2026-10-31", "2026-11-01", "2026-11-02"]);
 const m = missedByCourse(daysBetween("2026-10-26", "2026-10-30")); // a full week, no holidays
 assert.equal(m.get(486), 3); // CO: Mon, Wed, Thu
-assert.equal(m.get(504), 3); // DAA Lab: Mon, Thu, Fri
-assert.equal(m.get(487), 2); // DAA: Tue, Fri
+assert.equal(m.get(504), 4); // DAA Lab: Thu and Fri, two slots each
+assert.equal(m.get(487), 3); // DAA: Mon (the remapped lab slot), Tue, Fri
+assert.equal(m.get(565), 2); // Project Based Learning: Mon, two slots
+assert.equal(classesOn("2026-10-19").at(-1)!.subject, "DAA Lab"); // still shown as DAA Lab
+assert.equal(classesOn("2026-10-19").at(-1)!.courseid, 487);
 assert.equal(classesOn("2026-10-20").length, 0); // Dussehra
 assert.equal(classesOn("2026-11-09").length, 0); // Diwali break
 assert.equal(classesOn("2026-11-06").length, 0); // after teaching ends (and Diwali)

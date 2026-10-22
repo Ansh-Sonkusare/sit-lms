@@ -1,6 +1,7 @@
 import { isTeachingDay, TEACHING } from "./calendar.ts";
 
 // Section B, batch B1, semester III timetable (effective 2026-09-15).
+export const TIMETABLE_FROM = "2026-09-15";
 const BATCH = "B1";
 
 export const SLOT_TIMES: Record<number, [string, string]> = {
@@ -8,7 +9,7 @@ export const SLOT_TIMES: Record<number, [string, string]> = {
   6: ["13:20", "14:10"], 7: ["14:10", "15:00"], 8: ["15:00", "15:50"], 9: ["15:55", "16:45"],
 };
 
-type Entry = { subject: string; slots: number[]; room?: string; batch?: string; applicable?: boolean };
+type Entry = { subject: string; slots: number[]; room?: string; batch?: string; applicable?: boolean; marksAs?: string };
 
 const WEEK: Entry[][] = [
   [], // sunday
@@ -20,7 +21,8 @@ const WEEK: Entry[][] = [
     { subject: "ML", slots: [6], room: "CL-102" },
     { subject: "Flexi Credit", slots: [7] },
     { subject: "AR-III", slots: [8], room: "LAB 2" },
-    { subject: "DAA Lab", slots: [9], room: "LAB 2" },
+    // The LMS never records this slot under DAA Lab (504). Every Monday has one record under DAA (487) instead.
+    { subject: "DAA Lab", slots: [9], room: "LAB 2", marksAs: "DAA" },
   ],
   [
     { subject: "MAS", slots: [1], room: "CL-102" },
@@ -86,7 +88,7 @@ export const SUBJECT_COURSE: Record<string, number> = {
   "Mentor-Mentee Session": 563,
 };
 
-export type ClassBlock = { subject: string; courseid: number | null; start: string; end: string; room?: string };
+export type ClassBlock = { subject: string; courseid: number | null; start: string; end: string; room?: string; slots: number };
 
 const weekday = (iso: string) => {
   const [y, m, d] = iso.split("-").map(Number);
@@ -99,7 +101,8 @@ export function classesOn(iso: string): ClassBlock[] {
     .filter((e) => e.applicable !== false && (!e.batch || e.batch === BATCH) && e.subject !== "Lunch")
     .map((e) => ({
       subject: e.subject,
-      courseid: SUBJECT_COURSE[e.subject] ?? null,
+      courseid: SUBJECT_COURSE[e.marksAs ?? e.subject] ?? null,
+      slots: e.slots.length,
       start: SLOT_TIMES[e.slots[0]][0],
       end: SLOT_TIMES[e.slots.at(-1)!][1],
       room: e.room,
@@ -114,10 +117,10 @@ export function daysBetween(from: string, to: string): string[] {
   return out;
 }
 
-// ponytail: one timetable block = one attendance session; if labs are marked per slot, count e.slots.length instead.
+// The LMS records one attendance session per timetable slot, so a two-slot block counts twice.
 export function missedByCourse(days: string[]): Map<number, number> {
   const out = new Map<number, number>();
-  for (const day of days) for (const c of classesOn(day)) if (c.courseid) out.set(c.courseid, (out.get(c.courseid) ?? 0) + 1);
+  for (const day of days) for (const c of classesOn(day)) if (c.courseid) out.set(c.courseid, (out.get(c.courseid) ?? 0) + c.slots);
   return out;
 }
 
