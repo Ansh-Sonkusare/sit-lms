@@ -43,7 +43,7 @@ A timetable is data, not code. `src/lib/sit/timetable.ts` defines its shape (nam
 
 Admins are named in `ADMINS` as `<college id>:<Moodle user id>`, for example `sit-nagpur:1809`. An admin gets "Manage timetables" in the account menu. There they can create a timetable (blank, or a copy of another section's), edit it with one form per weekday, delete it, and pick the college default. The server checks admin rights again on every change. If two admins edit the same timetable, the second save fails with a message instead of overwriting the first.
 
-Shared timetables are stored as `timetables/<college>.json` in the Blob store. Personal copies are stored as `timetables/personal/<college>/<user id>.json`. The student's choice is in their preferences cookie. Until an admin saves a timetable, SIT Nagpur gets the built-in Semester III, Section B timetable (`SEED`). Without `BLOB_READ_WRITE_TOKEN`, all of this is kept in memory and is lost on restart.
+Shared timetables are stored as `timetables/<college>.json` in the Blob store. Personal copies are stored as `timetables/personal/<college>/<user id>.json`. The student's choice is in their preferences cookie, with the account it belongs to; another account on the same browser starts with the default. Until an admin saves a timetable, SIT Nagpur gets the built-in Semester III, Section B timetable (`SEED`). That happens only when the Blob store says there is no document: if the store can't be read, pages show an error and admin changes are refused. Admin changes are compare-and-swap writes, so two admins saving at the same time both keep their changes. Without `BLOB_READ_WRITE_TOKEN`, all of this is kept in memory and is lost on restart.
 
 ## Running it
 

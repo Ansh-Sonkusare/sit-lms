@@ -24,10 +24,10 @@ const BUSY = "Someone else is changing timetables right now. Nothing was changed
 export const isAdmin = (u: User) =>
   !!u.college.sit && (process.env.ADMINS ?? "").split(",").map((s) => s.trim()).includes(`${u.college.id}:${u.userid}`);
 
-// Short-lived per process: other instances see a write within TTL. Callers must not mutate what they get.
-// A read that fails twice throws and is not cached, so pages show an error instead of wrong attendance.
+// A read that fails twice throws, and cached() doesn't keep failures, so pages show an error instead of wrong attendance.
 const readForPage = (path: string) => store.read(path).catch(() => store.read(path));
 
+// Short-lived per process: other instances see a write within TTL. Callers must not mutate what they get.
 export const loadShared = (college: string) =>
   cached(memoKey(sharedPath(college)), TTL, async () => parseShared(college, await readForPage(sharedPath(college)).then((d) => (d ? d.value : undefined))));
 

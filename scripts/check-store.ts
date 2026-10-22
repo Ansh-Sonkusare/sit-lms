@@ -11,7 +11,6 @@ console.error = () => {};
 process.env.BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_teststore_secret";
 const { blobStore } = await import("../src/lib/blob-store.ts");
 
-// The blob adapter against canned HTTP replies: only a 404 is "missing".
 const agent = new MockAgent();
 agent.disableNetConnect();
 setGlobalDispatcher(agent);
@@ -41,7 +40,6 @@ await assert.rejects(blobStore.write("a.json", { x: 2 }, null), "a create that f
 api.intercept({ path: putPath, method: "PUT" }).reply(200, { url: "u", downloadUrl: "u", pathname: "a.json", contentType: "application/json", contentDisposition: "", etag: '"e2"' });
 assert.equal(await blobStore.write("a.json", { x: 2 }, '"e1"'), "ok");
 
-// The memory store behaves like the blob store.
 const mem = memoryStore();
 assert.equal(await mem.write("m", { n: 1 }, null), "ok");
 assert.equal(await mem.write("m", { n: 2 }, null), "conflict", "create refuses an existing document");
@@ -54,7 +52,6 @@ assert.deepEqual((await mem.read("m"))!.value, { n: 2 }, "mutating a read value 
 mem.raw.set("bad", { text: "{", etag: "x" });
 await assert.rejects(mem.read("bad"), /not valid JSON/);
 
-// update(): read fresh, change, compare-and-swap, start over on a conflict.
 const add = (item: string) => (cur: { value: unknown } | null) => {
   const list = (cur?.value as string[] | undefined) ?? ["seed"];
   return { write: [...list, item], result: item };
@@ -92,7 +89,6 @@ const faulty = (inner: DocStore, faults: { read?: number; conflicts?: number; on
   assert.deepEqual((await s.read("d"))!.value, ["seed", "kept"], "a read failure never replaces the stored document with the seed");
 }
 {
-  // Admin B writes between admin A's read and write: A's write conflicts, A re-reads and both changes are kept.
   const s = memoryStore();
   await s.write("d", ["seed"], null);
   let raced = false;
@@ -104,7 +100,7 @@ const faulty = (inner: DocStore, faults: { read?: number; conflicts?: number; on
     },
   });
   assert.deepEqual(await update(f, "d", add("from A")), { ok: true, result: "from A" });
-  assert.deepEqual((await s.read("d"))!.value, ["seed", "from B", "from A"]);
+  assert.deepEqual((await s.read("d"))!.value, ["seed", "from B", "from A"], "B wrote between A's read and write: A re-reads and both changes are kept");
 }
 {
   const s = memoryStore();
@@ -123,7 +119,6 @@ const faulty = (inner: DocStore, faults: { read?: number; conflicts?: number; on
   assert.equal(await s.read("e"), null);
 }
 
-// Admin changes to a college's timetables, through the same update() the app uses.
 const path = sharedPath(SEED.college);
 const shared = <R>(s: DocStore, apply: (doc: CollegeTimetables) => Change<R>) => updateShared<R | null>(s, SEED.college, null, apply);
 const stored = async (s: DocStore) => parseShared(SEED.college, (await s.read(path))!.value)!;
@@ -147,7 +142,6 @@ const create = (name: string) => (doc: CollegeTimetables) => applySave(doc, { ..
   assert.deepEqual(await shared(faulty(s, { read: 1 }), create("Section D")), { ok: false, reason: "unavailable" });
   assert.equal(s.raw.get(path)!.text, before, "a read failure never writes the seed over admins' timetables");
 
-  // Admin A edits the seed while admin B creates a timetable: both survive.
   const seed = (await stored(s)).list.find((t) => t.id === SEED.id)!;
   let raced = false;
   const racing = faulty(s, {
@@ -160,10 +154,9 @@ const create = (name: string) => (doc: CollegeTimetables) => applySave(doc, { ..
   const edit = (doc: CollegeTimetables) => applySave(doc, { ...seed, name: "Renamed" }, by("A"));
   assert.deepEqual(await shared(racing, edit), { ok: true, result: { ok: true, id: SEED.id } });
   const after = await stored(s);
-  assert.deepEqual(after.list.map((t) => t.name), ["Renamed", "Section A", "Section C", "Section E"]);
+  assert.deepEqual(after.list.map((t) => t.name), ["Renamed", "Section A", "Section C", "Section E"], "an edit racing a create keeps both");
   assert.equal(after.list[0].name, "Renamed");
 
-  // The stale-editor check runs again on the re-read document: B saved the seed in between, so A's save is refused.
   const loaded = after.list[0];
   raced = false;
   const second = faulty(s, {
