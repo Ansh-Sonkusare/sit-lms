@@ -65,7 +65,7 @@ npm run dev
 | `ADMINS` | no | Who can manage timetables: `<college id>:<Moodle user id>`, comma-separated, e.g. `sit-nagpur:1809` |
 | `COLLEGES` | no | Extra colleges for the login dropdown, e.g. `[{"id":"x","name":"X College","url":"https://lms.x.edu"}]` |
 
-Without an AI key, announcements show as cleaned-up text.
+Without an AI key, announcements show as cleaned-up text. If the provider rejects the key, rate-limits us or is down, summaries pause for a while (6 h for a bad key, until the retry-after time for a rate limit, 2 min otherwise) and resume by themselves. A new key lifts the pause at once.
 
 ### Checks
 
@@ -76,6 +76,7 @@ node scripts/check-format.ts      # text cleanup and wording
 node scripts/check-marks.ts       # LMS records compared with the timetable
 node scripts/check-timetables.ts  # timetable validation and the Suggested pick
 node scripts/check-store.ts       # stored documents: missing vs failed reads, write conflicts, admin edits
+node scripts/check-digest.ts      # AI summaries: provider gate, retry-after, per-user and hourly limits
 ```
 
 `scripts/spike.ts` signs in to `MOODLE_URL` with `MOODLE_USERNAME` / `MOODLE_PASSWORD` from `.env.local` and lists which web-service functions your token can call.
