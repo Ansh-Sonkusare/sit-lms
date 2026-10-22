@@ -39,8 +39,10 @@ It checks that the port answers, that `/login` returns 200 with the college sele
 Credentials come from the environment variables `MOODLE_USERNAME` and `MOODLE_PASSWORD`, or from the same names in the repo's `.env.local`. They are never in this skill and the scripts never print them. The account is a real SIT Nagpur LMS account (college id `sit-nagpur`, site https://lms.sitnagpur.edu.in). If you have none, you cannot verify logged-in pages. Say so. Do not fake it.
 
 ```
-node .claude/skills/verify/scripts/drive.mjs --base http://localhost:3123 --width 375 --text 400 / /attendance /courses/491?tab=attendance
+node .claude/skills/verify/scripts/drive.mjs --base http://localhost:3123 --width 375 --text 400 / /attendance '/courses/491?tab=attendance'
 ```
+
+Quote any path that has `?` or `&`. In zsh an unquoted `?` is a glob, and the command fails with `no matches found`.
 
 Options:
 
