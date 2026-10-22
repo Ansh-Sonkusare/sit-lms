@@ -7,6 +7,8 @@ import { readJson, writeJson } from "./store.ts";
 import { cleanCourse, cleanHtml, todayIST } from "./format.ts";
 import { cacheKey, type Announcement, type Course } from "./data.ts";
 import type { User } from "./session.ts";
+import { getSchedule } from "./timetables.ts";
+import { scheduleLabel } from "./sit/timetable.ts";
 
 // Plain text for the model, keeping link targets.
 const toText = (html: string) =>
@@ -39,11 +41,12 @@ const Item = z.strictObject({
 });
 export type DigestItem = z.infer<typeof Item>;
 
-const student = (u: User) =>
-  u.college.sit ? `${u.college.name}. Semester III, section B, batch B1, odd semester 2026-27.` : `${u.college.name}. Section and batch unknown, so treat every announcement as for them.`;
+// `timetable`: the student's timetable label ("Semester III · Section B, batch B1"), when known.
+const student = (u: User, timetable: string | null) =>
+  timetable ? `${u.college.name}. ${timetable}.` : `${u.college.name}. Section and batch unknown, so treat every announcement as for them.`;
 
-const system = (u: User) => `You turn college LMS announcements into a clean digest for one student.
-Student: ${student(u)}
+const system = (u: User, timetable: string | null) => `You turn college LMS announcements into a clean digest for one student.
+Student: ${student(u, timetable)}
 Announcements are often pasted from Word or WhatsApp: ignore greetings, signatures, emoji, repeated headings and formatting noise.
 Resolve partial or relative dates ("by Friday", "22-24 Sept") against the posted date. Never invent a date that isn't stated.
 In summaries and actions write dates like "23 Oct" or "Fri 23 Oct", never YYYY-MM-DD.
@@ -143,7 +146,7 @@ export async function readDigest(u: User, news: Announcement[]): Promise<Digest 
 }
 
 // Summarize only what's new, changed or stale, then save. One run per user at a time.
-export function refreshDigest(u: User, news: Announcement[], courses: Course[]): Promise<void> {
+export function refreshDigest(u: User, news: Announcement[], courses: Course[], timetable: string | null): Promise<void> {
   const ask = process.env.GROQ_API_KEY ? viaGroq : process.env.ANTHROPIC_API_KEY ? viaClaude : null;
   if (!ask) return Promise.resolve();
   const key = cacheKey(u);
@@ -174,7 +177,7 @@ export function refreshDigest(u: User, news: Announcement[], courses: Course[]):
     };
     const got = new Map<number, DigestItem>();
     const run = async (part: typeof input) => {
-      const items = await ask(system(u), `Today is ${todayIST()}.\n\nAnnouncements:\n${JSON.stringify(part, null, 1)}`);
+      const items = await ask(system(u, timetable), `Today is ${todayIST()}.\n\nAnnouncements:\n${JSON.stringify(part, null, 1)}`);
       const fresh = new Map<number, DigestItem>();
       for (const it of items) if (part.some((p) => p.id === it.id)) fresh.set(it.id, it);
       fresh.forEach((v, k) => got.set(k, v));
@@ -192,6 +195,8 @@ export function refreshDigest(u: User, news: Announcement[], courses: Course[]):
 // Pages call this: cached digest now, and a background refresh after the response if anything is missing.
 export async function getDigest(u: User, news: Announcement[], courses: Course[]): Promise<Digest> {
   const d = await readDigest(u, news).catch(() => ({ items: new Map(), pending: 0, updatedAt: null, needs: [] }));
-  if (d.needs.length) after(() => refreshDigest(u, news, courses).catch((e) => console.error("[digest]", e)));
+  // read the timetable now: the background refresh runs after the response, without the request's cookies
+  const info = d.needs.length ? await getSchedule(u).catch(() => null) : null;
+  if (d.needs.length) after(() => refreshDigest(u, news, courses, info ? scheduleLabel(info.schedule) : null).catch((e) => console.error("[digest]", e)));
   return { items: d.items, pending: d.needs.filter((a) => !d.items.has(a.id)).length, updatedAt: d.updatedAt };
 }
