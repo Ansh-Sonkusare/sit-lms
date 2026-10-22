@@ -3,7 +3,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { after } from "next/server";
-import { readJson, writeJson } from "./store.ts";
+import { store as docs } from "./store.ts";
+import { update } from "./doc.ts";
 import { cleanCourse, cleanHtml, todayIST } from "./format.ts";
 import { cacheKey, type Announcement, type Course } from "./data.ts";
 import type { User } from "./session.ts";
@@ -130,7 +131,7 @@ export type Digest = { items: Map<number, DigestItem>; pending: number; updatedA
 
 // What's cached right now, without calling the AI. Stale entries are still shown until refreshed.
 export async function readDigest(u: User, news: Announcement[]): Promise<Digest & { needs: Announcement[] }> {
-  const store = (await readJson<Store>(pathOf(u)).catch(() => null)) ?? { items: {} };
+  const store = ((await docs.read(pathOf(u)).catch(() => null))?.value as Store | undefined) ?? { items: {} };
   const items = new Map<number, DigestItem>();
   const needs: Announcement[] = [];
   let updatedAt: number | null = null;
@@ -166,14 +167,16 @@ export function refreshDigest(u: User, news: Announcement[], courses: Course[], 
     }));
     // save after every batch so progress survives a cut-off background run
     const save = async (got: Map<number, DigestItem>) => {
-      const store = (await readJson<Store>(pathOf(u)).catch(() => null)) ?? { items: {} };
-      for (const a of needs) {
-        const d = got.get(a.id);
-        if (d) store.items[entryKey(a)] = { at: Date.now(), d };
-      }
-      const keep = new Set(news.slice(0, KEEP).map(entryKey));
-      for (const k of Object.keys(store.items)) if (!keep.has(k)) delete store.items[k];
-      await writeJson(pathOf(u), store);
+      await update(docs, pathOf(u), (cur) => {
+        const store = (cur?.value as Store | undefined) ?? { items: {} };
+        for (const a of needs) {
+          const d = got.get(a.id);
+          if (d) store.items[entryKey(a)] = { at: Date.now(), d };
+        }
+        const keep = new Set(news.slice(0, KEEP).map(entryKey));
+        for (const k of Object.keys(store.items)) if (!keep.has(k)) delete store.items[k];
+        return { write: store, result: null };
+      });
     };
     const got = new Map<number, DigestItem>();
     const run = async (part: typeof input) => {

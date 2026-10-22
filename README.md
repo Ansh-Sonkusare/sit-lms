@@ -75,6 +75,7 @@ node scripts/check-timetable.ts   # timetable, holidays, leave credit
 node scripts/check-format.ts      # text cleanup and wording
 node scripts/check-marks.ts       # LMS records compared with the timetable
 node scripts/check-timetables.ts  # timetable validation and the Suggested pick
+node scripts/check-store.ts       # stored documents: missing vs failed reads, write conflicts, admin edits
 ```
 
 `scripts/spike.ts` signs in to `MOODLE_URL` with `MOODLE_USERNAME` / `MOODLE_PASSWORD` from `.env.local` and lists which web-service functions your token can call.
