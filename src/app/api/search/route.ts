@@ -11,7 +11,7 @@ const file = (url: string) => `/api/file?url=${encodeURIComponent(url)}`;
 export async function GET() {
   const u = await currentUser();
   if (!u) return new Response("Unauthorized", { status: 401 });
-  const courses = (await getMyCourses(u, (await getSchedule(u))?.schedule ?? null)).mine;
+  const courses = (await getMyCourses(u, (await getSchedule(u).catch(() => null))?.schedule ?? null)).mine;
   const per = await Promise.all(
     courses.map(async (c): Promise<SearchItem[]> => {
       const name = cleanCourse(c.fullname);

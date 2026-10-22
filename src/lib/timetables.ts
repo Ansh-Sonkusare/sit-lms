@@ -25,9 +25,11 @@ export const isAdmin = (u: User) =>
   !!u.college.sit && (process.env.ADMINS ?? "").split(",").map((s) => s.trim()).includes(`${u.college.id}:${u.userid}`);
 
 // Short-lived per process: other instances see a write within TTL. Callers must not mutate what they get.
-// A failed read throws and is not cached.
+// A read that fails twice throws and is not cached, so pages show an error instead of wrong attendance.
+const readForPage = (path: string) => store.read(path).catch(() => store.read(path));
+
 export const loadShared = (college: string) =>
-  cached(memoKey(sharedPath(college)), TTL, async () => parseShared(college, await store.read(sharedPath(college)).then((d) => (d ? d.value : undefined))));
+  cached(memoKey(sharedPath(college)), TTL, async () => parseShared(college, await readForPage(sharedPath(college)).then((d) => (d ? d.value : undefined))));
 
 async function changeShared<R>(college: string, apply: (doc: CollegeTimetables) => Change<R>) {
   const r = await updateShared(store, college, apply);
@@ -61,7 +63,7 @@ function parsePersonal(path: string, cur: Doc | null): Timetable | null {
 
 export const loadPersonal = (college: string, userid: number) => {
   const path = personalPath(college, userid);
-  return cached(memoKey(path), TTL, async () => parsePersonal(path, await store.read(path)));
+  return cached(memoKey(path), TTL, async () => parsePersonal(path, await readForPage(path)));
 };
 
 async function updatePersonal<R>(college: string, userid: number, apply: (copy: Timetable | null) => Change<R>): Promise<Updated<R>> {
