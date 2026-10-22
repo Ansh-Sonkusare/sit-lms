@@ -7,7 +7,8 @@ import { getSession, requireUser } from "@/lib/session.ts";
 import { findCollege } from "@/lib/colleges.ts";
 import { cacheKey } from "@/lib/data.ts";
 import { getLeaves, saveLeaves, setExtraCourse, setTimetableChoice, setUpdateDone } from "@/lib/prefs.ts";
-import { loadShared, optionsOf } from "@/lib/timetables.ts";
+import { deleteShared, isAdmin, loadShared, optionsOf, saveShared, setDefault } from "@/lib/timetables.ts";
+import type { FieldError } from "@/lib/sit/timetable.ts";
 
 export async function login(_: string | null, form: FormData) {
   const username = String(form.get("username") ?? "").trim();
@@ -83,5 +84,41 @@ export async function chooseTimetable(form: FormData) {
   const option = optionsOf(doc?.list ?? []).find((o) => o.timetable.id === id && (o.batch ?? "") === batch);
   if (!option) return;
   await setTimetableChoice({ id, batch: option.batch });
+  refreshRoute();
+}
+
+const parseJson = (form: FormData): unknown => {
+  try {
+    return JSON.parse(String(form.get("json") ?? ""));
+  } catch {
+    return null;
+  }
+};
+
+// Every shared-timetable action checks the caller is an admin again: actions can be posted to directly.
+async function requireAdmin() {
+  const u = await requireUser();
+  return isAdmin(u) ? u : null;
+}
+
+export async function saveSharedTimetable(_: FieldError[] | null, form: FormData): Promise<FieldError[] | null> {
+  const u = await requireAdmin();
+  if (!u) return [{ path: "", message: "Only admins can change shared timetables." }];
+  const r = await saveShared(u, parseJson(form));
+  if (!r.ok) return r.errors;
+  redirect("/admin/timetables");
+}
+
+export async function deleteTimetable(id: string) {
+  const u = await requireAdmin();
+  if (!u) return;
+  await deleteShared(u, id);
+  refreshRoute();
+}
+
+export async function makeDefaultTimetable(id: string) {
+  const u = await requireAdmin();
+  if (!u) return;
+  await setDefault(u, id);
   refreshRoute();
 }

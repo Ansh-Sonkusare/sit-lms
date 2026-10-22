@@ -5,7 +5,7 @@ import { cached, clearCache } from "./moodle.ts";
 import { readJson, writeJson } from "./store.ts";
 import { getTimetableChoice } from "./prefs.ts";
 import { getCourses, getSessions } from "./data.ts";
-import { coursesOf, RESERVED_IDS, SEED, slugify, TimetableSchema, type Schedule, type Timetable } from "./sit/timetable.ts";
+import { coursesOf, fieldErrors, RESERVED_IDS, SEED, slugify, TimetableSchema, type FieldError, type Schedule, type Timetable } from "./sit/timetable.ts";
 import { rankSchedules, suggestion } from "./sit/suggest.ts";
 import { todayIST } from "./format.ts";
 import type { User } from "./session.ts";
@@ -76,9 +76,8 @@ export async function suggestedOption(u: User, options: Schedule[]): Promise<num
   return suggestion(rankSchedules(options, new Map(lists.filter((x) => x !== null)), todayIST()));
 }
 
-export type SaveResult = { ok: true; id: string } | { ok: false; errors: { path: string; message: string }[] };
-const fail = (message: string, path = ""): SaveResult => ({ ok: false, errors: [{ path, message }] });
-const issues = (e: z.ZodError): SaveResult => ({ ok: false, errors: e.issues.map((i) => ({ path: i.path.join("."), message: i.message })) });
+export type SaveResult = { ok: true; id: string } | { ok: false; errors: FieldError[] };
+const fail = (message: string): SaveResult => ({ ok: false, errors: [{ path: "", message }] });
 
 const savedAt = (iso: string) => new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 
@@ -110,7 +109,7 @@ export async function saveShared(u: User, raw: unknown): Promise<SaveResult> {
     owner: undefined,
     basedOnAt: undefined,
   });
-  if (!parsed.success) return issues(parsed.error);
+  if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
   const list = isNew ? [...doc.list, parsed.data] : doc.list.map((t) => (t.id === id ? parsed.data : t));
   await writeShared(u.college.id, { ...doc, list });
   return { ok: true, id };

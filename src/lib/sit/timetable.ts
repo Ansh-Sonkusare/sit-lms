@@ -76,6 +76,10 @@ export const TimetableSchema = z
     });
   }) satisfies z.ZodType<Timetable, unknown>;
 
+// A validation message for the editor; path like "blocks.3.slots" or "" for the whole timetable.
+export type FieldError = { path: string; message: string };
+export const fieldErrors = (e: z.ZodError): FieldError[] => e.issues.map((i) => ({ path: i.path.join("."), message: i.message }));
+
 export const slugify = (s: string) =>
   s
     .toLowerCase()
