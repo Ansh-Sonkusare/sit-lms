@@ -51,5 +51,9 @@ assert.equal(ranked[0].score, 1);
 assert.equal(suggestion(ranked), 1);
 assert.deepEqual(rankSchedules(options, new Map([[1, rec(["2026-10-26"])]]), "2026-11-06"), []); // too few records
 assert.equal(suggestion(rankSchedules([options[1], options[1]], sessions, "2026-11-06")), null); // a tie suggests nothing
+// The B1/B2 case: A plus labs the LMS never marks, against A without course 3 (fewer planned classes, fewer records explained). Explaining records wins.
+const aPlus = tiny("a-plus", [...a.blocks, { day: 4, slots: [1, 2, 3], subject: "Unmarked lab", course: 4 }, { day: 5, slots: [1, 2, 3], subject: "Unmarked lab", course: 4 }]);
+const aMinus = tiny("a-minus", a.blocks.filter((x) => x.course !== 3));
+assert.equal(suggestion(rankSchedules([{ timetable: aMinus, batch: null }, { timetable: aPlus, batch: null }], sessions, "2026-11-06")), 1);
 
 console.log("timetables ok");

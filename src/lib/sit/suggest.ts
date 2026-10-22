@@ -4,10 +4,11 @@ import { classesOn, daysBetween, type Schedule } from "./timetable.ts";
 // Fewer records than this say too little about which timetable you follow.
 export const MIN_SESSIONS = 10;
 
-export type Ranked = { index: number; score: number };
+export type Ranked = { index: number; score: number; precision: number };
 
 // How well each option explains the attendance the LMS recorded for you, best first.
-// Score: per course per day, the classes both the records and the option agree on, over the larger of the two totals.
+// Score: the share of your recorded sessions that land on a class of the option (per course per day).
+// Unrecorded classes only break ties: teachers often skip marking, so an option that plans fewer classes must not win for that.
 // Only days before `today` count, since today's classes may not be marked yet. Options with too few records in range are left out.
 export function rankSchedules(options: Schedule[], sessions: Map<number, { date: string; mark: string }[]>, today: string): Ranked[] {
   const end = today <= TEACHING.end ? today : nextDay(TEACHING.end);
@@ -35,15 +36,15 @@ export function rankSchedules(options: Schedule[], sessions: Map<number, { date:
         }
     let matched = 0;
     for (const [key, n] of expected) matched += Math.min(n, recorded.get(key) ?? 0);
-    return [{ index, score: matched / Math.max(total, planned) }];
+    return [{ index, score: matched / total, precision: planned ? matched / planned : 0 }];
   });
-  return ranked.sort((a, b) => b.score - a.score || a.index - b.index);
+  return ranked.sort((a, b) => b.score - a.score || b.precision - a.precision || a.index - b.index);
 }
 
 // The option to badge "Suggested": a clear best with some agreement, or none.
 export function suggestion(ranked: Ranked[]): number | null {
   const [best, next] = ranked;
-  return best && best.score > 0 && (!next || best.score > next.score) ? best.index : null;
+  return best && best.score > 0 && (!next || best.score > next.score || best.precision > next.precision) ? best.index : null;
 }
 
 function nextDay(iso: string) {
