@@ -5,8 +5,9 @@ import type { Leave } from "./sit/timetable.ts";
 export type { Leave };
 
 // timetable: the one you picked; id "personal" is your own copy. Absent: the college default.
+// owner "<college id>:<user id>": the cookie outlives sign-out, so another account on this browser must not inherit the pick.
 export type TimetableChoice = { id: string; batch: string | null };
-type Prefs = { leaves?: Leave[]; extraCourses?: number[]; doneUpdates?: number[]; timetable?: TimetableChoice };
+type Prefs = { leaves?: Leave[]; extraCourses?: number[]; doneUpdates?: number[]; timetable?: TimetableChoice & { owner?: string } };
 
 // Its own long-lived cookie (name kept from when it only held leaves), so signing out doesn't wipe it.
 // ponytail: cookie-sized (~40 leaves); move to a server store if it outgrows that.
@@ -57,13 +58,16 @@ export async function setUpdateDone(id: number, done: boolean) {
   await s.save();
 }
 
-export async function getTimetableChoice(): Promise<TimetableChoice | null> {
-  return (await store()).timetable ?? null;
+const ownerOf = (college: string, userid: number) => `${college}:${userid}`;
+
+export async function getTimetableChoice(college: string, userid: number): Promise<TimetableChoice | null> {
+  const t = (await store()).timetable;
+  return t && t.owner === ownerOf(college, userid) ? { id: t.id, batch: t.batch } : null;
 }
 
-export async function setTimetableChoice(choice: TimetableChoice | null) {
+export async function setTimetableChoice(college: string, userid: number, choice: TimetableChoice | null) {
   const s = await store();
-  if (choice) s.timetable = choice;
+  if (choice) s.timetable = { ...choice, owner: ownerOf(college, userid) };
   else delete s.timetable;
   await s.save();
 }

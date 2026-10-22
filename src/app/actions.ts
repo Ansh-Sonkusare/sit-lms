@@ -82,7 +82,7 @@ export async function chooseTimetable(form: FormData) {
   const [id, batch = ""] = String(form.get("choice") ?? "").split("|");
   const option = (await optionsFor(u)).find((o) => o.timetable.id === id && (o.batch ?? "") === batch);
   if (!option) return;
-  await setTimetableChoice({ id, batch: option.batch });
+  await setTimetableChoice(u.college.id, u.userid, { id, batch: option.batch });
   refreshRoute();
 }
 

@@ -77,7 +77,7 @@ async function updatePersonal<R>(college: string, userid: number, apply: (copy: 
 const scheduleOf = cache(async (college: string, userid: number): Promise<ScheduleInfo | null> => {
   const doc = await loadShared(college);
   if (!doc) return null;
-  const choice = await getTimetableChoice();
+  const choice = await getTimetableChoice(college, userid);
   const picked = choice?.id === "personal" ? await loadPersonal(college, userid) : doc.list.find((t) => t.id === choice?.id);
   if (choice && picked && fits(picked, choice.batch)) return { schedule: { timetable: picked, batch: choice.batch }, chosen: true, personal: choice.id === "personal" };
   const fallback = doc.list.find((t) => t.id === doc.defaultId)!;
@@ -130,7 +130,7 @@ export async function makePersonal(u: User) {
   });
   if (!r.ok) throw new Error(`Your copy couldn't be made: ${r.reason}`);
   const batch = fits(r.result, info.schedule.batch) ? info.schedule.batch : (r.result.batches[0] ?? null);
-  await setTimetableChoice({ id: "personal", batch });
+  await setTimetableChoice(u.college.id, u.userid, { id: "personal", batch });
 }
 
 // Like saveShared, for the caller's own copy. Owner and origin are kept from the stored copy, never taken from the form.
@@ -158,8 +158,8 @@ export async function savePersonal(u: User, raw: unknown): Promise<SaveResult> {
   if (!r.ok) return fail(r.reason === "conflict" ? "Your copy is being saved somewhere else right now. Nothing was changed; try again." : UNAVAILABLE);
   if ("ok" in r.result) return r.result;
   const saved = r.result;
-  const choice = await getTimetableChoice();
-  if (choice?.id === "personal" && !fits(saved, choice.batch)) await setTimetableChoice({ id: "personal", batch: saved.batches[0] ?? null });
+  const choice = await getTimetableChoice(u.college.id, u.userid);
+  if (choice?.id === "personal" && !fits(saved, choice.batch)) await setTimetableChoice(u.college.id, u.userid, { id: "personal", batch: saved.batches[0] ?? null });
   return { ok: true, id: "personal" };
 }
 
@@ -167,8 +167,8 @@ export async function savePersonal(u: User, raw: unknown): Promise<SaveResult> {
 export async function discardPersonal(u: User) {
   const r = await updatePersonal(u.college.id, u.userid, (copy) => (copy ? { write: null, result: copy } : { result: null }));
   if (!r.ok) throw new Error(`Your copy couldn't be deleted: ${r.reason}`);
-  const choice = await getTimetableChoice();
+  const choice = await getTimetableChoice(u.college.id, u.userid);
   if (choice?.id !== "personal") return;
   const source = (await loadShared(u.college.id))?.list.find((t) => t.id === r.result?.basedOn);
-  await setTimetableChoice(source && fits(source, choice.batch) ? { id: source.id, batch: choice.batch } : null);
+  await setTimetableChoice(u.college.id, u.userid, source && fits(source, choice.batch) ? { id: source.id, batch: choice.batch } : null);
 }
