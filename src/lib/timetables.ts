@@ -153,9 +153,15 @@ export async function setDefault(u: User, id: string) {
 }
 
 // Copies the timetable you follow now into your own copy and switches you to it.
+// An existing copy is never overwritten: you are switched to it instead.
 export async function makePersonal(u: User) {
   const info = await getSchedule(u);
   if (!info || info.personal) return;
+  const existing = await loadPersonal(u.college.id, u.userid);
+  if (existing) {
+    const batch = fits(existing, info.schedule.batch) ? info.schedule.batch : (existing.batches[0] ?? null);
+    return setTimetableChoice({ id: "personal", batch });
+  }
   const t = info.schedule.timetable;
   const copy: Timetable = { ...t, id: "personal", owner: u.userid, basedOn: t.id, basedOnAt: t.updatedAt, updatedAt: new Date().toISOString(), updatedBy: u.fullname || undefined };
   await writePersonal(u.college.id, u.userid, copy);

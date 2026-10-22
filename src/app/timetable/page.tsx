@@ -36,7 +36,7 @@ export default async function TimetablePage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {personal ? (
+          {options.some(isCopy) ? (
             <>
               <Link href="/timetable/edit" className="btn">Edit my copy</Link>
               <form action={discardMyTimetableCopy}>
